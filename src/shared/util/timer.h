@@ -110,7 +110,7 @@ public:
   }
 };
 
-typedef uint32_t cycle_t;
+typedef uint64_t cycle_t;
 typedef uint64_t cycle64_t;
 
 // Access clock cycle counter on i386 compatibles
@@ -132,6 +132,14 @@ typedef uint64_t cycle64_t;
 #define get_cycle64(cnt) \
     __asm__ __volatile__("rdtsc" : "=A" (cnt))
 
+#endif
+
+#ifdef __APPLE__
+#include <mach/mach_time.h>
+static inline void get_cycle(cycle_t &cnt) {
+  cnt = mach_absolute_time();
+}
+#define get_cycle64(cnt) do { cnt = mach_absolute_time(); } while(0)
 #endif
 
 

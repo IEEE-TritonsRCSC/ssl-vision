@@ -40,12 +40,12 @@ bool CMVisionThreshold::thresholdImageYUV422_UYVY(Image<raw8> * target, const Ra
     return false;
   }
 
-  register lut_mask_t * LUT = lut->getTable();
+  lut_mask_t * LUT = lut->getTable();
 
-  register unsigned int          target_size    = target->getNumPixels();
-  register uyvy *       source_pointer = (uyvy*)(source->getData());
-  register raw8 *      target_pointer = target->getPixelData();
-  register unsigned char *      mask_pointer = mask->getData();
+  unsigned int          target_size    = target->getNumPixels();
+  uyvy *       source_pointer = (uyvy*)(source->getData());
+  raw8 *      target_pointer = target->getPixelData();
+  unsigned char *      mask_pointer = mask->getData();
 
   if (target->getNumPixels() != source->getNumPixels()) {
     fprintf(stderr, "CMVision YUV422_UYVY thresholding: source (num=%d  w=%d  h=%d) and target (num=%d w=%d h=%d) pixel counts do not match!\n", source->getNumPixels(),source->getWidth(),source->getHeight(), target->getNumPixels(),target->getWidth(),target->getHeight());
@@ -61,8 +61,8 @@ bool CMVisionThreshold::thresholdImageYUV422_UYVY(Image<raw8> * target, const Ra
   uyvy p;
   for (unsigned int i=0;i<target_size;i+=2) {
     p=source_pointer[(i >> 0x01)];
-    register int B=((p.u >> Y_SHIFT) << Z_BITS);
-    register int C=(p.v >> Z_SHIFT);
+    int B=((p.u >> Y_SHIFT) << Z_BITS);
+    int C=(p.v >> Z_SHIFT);
     target_pointer[i] =  mask_pointer[i] & LUT[(((p.y1 >> X_SHIFT) << Z_AND_Y_BITS) | B | C)];
     target_pointer[i+1] =  mask_pointer[i+1] & LUT[(((p.y2 >> X_SHIFT) << Z_AND_Y_BITS) | B | C)];
   }
@@ -76,12 +76,12 @@ bool CMVisionThreshold::thresholdImageYUV444(Image<raw8> * target, const ImageIn
     return false;
   }
 
-  register lut_mask_t * LUT = lut->getTable();
+  lut_mask_t * LUT = lut->getTable();
 
-  register unsigned int          target_size    = target->getNumPixels();
-  register yuv  *                source_pointer = (yuv*)(source->getData());
-  register raw8 *                target_pointer = target->getPixelData();
-  register unsigned char *       mask_pointer = mask->getData();
+  unsigned int          target_size    = target->getNumPixels();
+  yuv  *                source_pointer = (yuv*)(source->getData());
+  raw8 *                target_pointer = target->getPixelData();
+  unsigned char *       mask_pointer = mask->getData();
 
   if (target->getNumPixels() != source->getNumPixels()) {
      fprintf(stderr, "CMVision YUV444 thresholding: source (num=%d  w=%d  h=%d) and target (num=%d w=%d h=%d) pixel counts do not match!\n", source->getNumPixels(),source->getWidth(),source->getHeight(), target->getNumPixels(),target->getWidth(),target->getHeight());
@@ -112,7 +112,7 @@ bool CMVisionThreshold::thresholdImageRGB(Image<raw8> * target, const ImageInter
     return false;
   }
 
-  register lut_mask_t * LUT = lut->getTable();
+  lut_mask_t * LUT = lut->getTable();
   int source_size    = source->getNumPixels();
   const rgb * source_pointer = (const rgb*)(source->getData());
   auto * target_pointer = (uint8_t*) target->getPixelData();

@@ -35,7 +35,7 @@ AffinityManager::~AffinityManager()
 }
 
 void AffinityManager::demandCore(int core) {
-
+#ifdef __linux__
   DT_LOCK;
   unsigned int tid=(long int)syscall(__NR_gettid);
   printf("The ID of this thread is: %d\n", tid);
@@ -46,7 +46,7 @@ void AffinityManager::demandCore(int core) {
     CPU_CLR(i, &cpu_set);
   }
   int max_cores=cores.size();
- 
+   
 
   if (core < 0) core=0;
   int modded_core=core % max_cores;
@@ -69,9 +69,11 @@ void AffinityManager::demandCore(int core) {
     }
   } else {
     printf("Error while setting affinity\n");
-  }	
-
+  }
   DT_UNLOCK;
+#else
+  (void)core;
+#endif
 }
 
 int AffinityManager::parseFileUpTo(FILE * f, char * output, int len, char end) {
@@ -99,6 +101,7 @@ int AffinityManager::parseFileUpTo(FILE * f, char * output, int len, char end) {
 }
 
 void AffinityManager::parseCpuInfo() {
+#ifdef __linux__
   DT_LOCK;
   cores.clear();
   int n=0;
@@ -151,4 +154,7 @@ void AffinityManager::parseCpuInfo() {
   }
   printf("==================================================================\n");
   DT_UNLOCK;
+#else
+  // No CPU affinity support on non-Linux platforms
+#endif
 }

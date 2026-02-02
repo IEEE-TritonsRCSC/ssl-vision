@@ -230,10 +230,10 @@ void GLText::initializeGlyph(char ch)
   }
   
   GLUtesselator* tess = gluNewTess();
-  gluTessCallback(tess, GLU_TESS_BEGIN, (_GLUfuncptr) tessBeginCB);
-  gluTessCallback(tess, GLU_TESS_END, (_GLUfuncptr) tessEndCB);
-  gluTessCallback(tess, GLU_TESS_ERROR, (_GLUfuncptr) tessErrorCB);
-  gluTessCallback(tess, GLU_TESS_VERTEX, (_GLUfuncptr) tessVertexCB);
+  gluTessCallback(tess, GLU_TESS_BEGIN, (GLvoid (__stdcall *)()) tessBeginCB);
+  gluTessCallback(tess, GLU_TESS_END, (GLvoid (__stdcall *)()) tessEndCB);
+  gluTessCallback(tess, GLU_TESS_ERROR, (GLvoid (__stdcall *)()) tessErrorCB);
+  gluTessCallback(tess, GLU_TESS_VERTEX, (GLvoid (__stdcall *)()) tessVertexCB);
   
   glMatrixMode(GL_MODELVIEW);
   glPushMatrix();

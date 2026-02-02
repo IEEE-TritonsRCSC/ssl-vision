@@ -43,9 +43,9 @@ LUTWidget::LUTWidget(LUT3D * lut, LUTChannelMode mode)
   toolbar->setSizePolicy( QSizePolicy::Preferred, QSizePolicy::Preferred );
 
   vbox->setSpacing(2);
-  vbox->setMargin(0);
+  vbox->setContentsMargins(0, 0, 0, 0);
   hbox->setSpacing(2);
-  hbox->setMargin(0);
+  hbox->setContentsMargins(0, 0, 0, 0);
   hbox->addWidget(gllut);
   hbox->addWidget(list);
   vbox->addWidget(toolbar);

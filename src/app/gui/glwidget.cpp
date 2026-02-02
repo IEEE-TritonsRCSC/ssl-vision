@@ -105,7 +105,8 @@ void GLWidget::paintGL() {
   mainDraw();
 }
 
-GLWidget::GLWidget ( QWidget *parent , bool allow_qpainter_overlay) : QGLWidget ( allow_qpainter_overlay ? QGLFormat(QGL::SampleBuffers) : QGLFormat(), parent ) {
+GLWidget::GLWidget ( QWidget *parent , bool allow_qpainter_overlay) : GL_WIDGET_BASE( parent ) {
+  (void)allow_qpainter_overlay;
   ALLOW_QPAINTER=allow_qpainter_overlay;
   rb_bb=0;
   rb=0;
@@ -201,7 +202,7 @@ void GLWidget::initializeGL() {
 
 void GLWidget::myGLinit() {
 
-  qglClearColor ( QColor ( 64,64,128 ) );
+  glClearColor(0.25, 0.25, 0.5, 1.0);
 
   //qpainter stuff:
   if (ALLOW_QPAINTER) {
@@ -217,6 +218,10 @@ void GLWidget::myGLinit() {
 }
 
 void GLWidget::paintEvent ( QPaintEvent * e ) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+  (void)e;
+  mainDraw();
+#else
   //QGLWidget::paintEvent(e);
   if (ALLOW_QPAINTER) {
     ( void ) e;
@@ -224,6 +229,7 @@ void GLWidget::paintEvent ( QPaintEvent * e ) {
   } else {
     QGLWidget::paintEvent(e);
   }
+#endif
 
 }
 
@@ -243,7 +249,7 @@ void GLWidget::mainDraw() {
     /// new qpainter overlay stuff
     QTransform trans=zoom.getQTransform(false);
     QPainter painter;
-    painter.begin((QGLWidget*)this);
+    painter.begin(this);
     painter.setRenderHint(QPainter::Antialiasing);
     myQPainterOverlay(painter,trans);
 
@@ -319,7 +325,11 @@ void GLWidget::resizeGL ( int width, int height ) {
 
 void GLWidget::wheelEvent ( QWheelEvent * event ) {
   event->setAccepted ( false );
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+  pixelloc loc=zoom.invZoom ( event->position().x(),event->position().y(),true );
+#else
   pixelloc loc=zoom.invZoom ( event->pos().x(),event->pos().y(),true );
+#endif
   if ( stack!= nullptr ) stack->wheelEvent ( event,loc );
   if ( event->isAccepted() ) return;
   int delta=event->angleDelta().y();

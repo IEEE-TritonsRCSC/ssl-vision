@@ -24,7 +24,7 @@ ColorPicker::ColorPicker() {
   QHBoxLayout *hboxLayout;
   hboxLayout = new QHBoxLayout ( this );
   hboxLayout->setSpacing ( 4 );
-  hboxLayout->setMargin ( 2 );
+  hboxLayout->setContentsMargins(2, 2, 2, 2);
 
   swatch = new Swatch();
   label = new QLabel();

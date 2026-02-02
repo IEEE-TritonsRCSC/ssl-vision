@@ -26,6 +26,9 @@
 #endif
 #include "capturefromfile.h"
 #include "capturev4l.h"
+#ifdef AVFOUNDATION_CAPTURE
+#include "capture_avfoundation.h"
+#endif
 #include "capture_generator.h"
 #include "capture_splitter.h"
 #include <QThread>
@@ -81,6 +84,9 @@ protected:
   CaptureInterface * captureBasler = nullptr;
   CaptureInterface * captureSpinnaker = nullptr;
   CaptureInterface * captureSplitter = nullptr;
+#ifdef AVFOUNDATION_CAPTURE
+  CaptureInterface * captureAVFoundation = nullptr;
+#endif
   AffinityManager * affinity;
   FrameBuffer * rb;
   bool _kill;
@@ -97,6 +103,9 @@ protected:
   VarList * basler = nullptr;
   VarList * spinnaker = nullptr;
   VarList * splitter = nullptr;
+#ifdef AVFOUNDATION_CAPTURE
+  VarList * avfoundation = nullptr;
+#endif
   VarList * control;
   VarTrigger * c_start;
   VarTrigger * c_stop;

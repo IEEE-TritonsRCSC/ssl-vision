@@ -21,6 +21,10 @@
 
 #include "soccerview.h"
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#include <QSurfaceFormat>
+#endif
+
 #include "field.h"
 #include "field_default_constants.h"
 
@@ -41,8 +45,11 @@ GLSoccerView::FieldDimensions::FieldDimensions() :
 }
 
 GLSoccerView::GLSoccerView(QWidget* parent) :
-    QGLWidget(QGLFormat(
-        QGL::DoubleBuffer | QGL::DepthBuffer | QGL::SampleBuffers),parent) {
+    GL_WIDGET_BASE(parent) {
+  QSurfaceFormat format;
+  format.setDepthBufferSize(24);
+  format.setSamples(4);
+  setFormat(format);
   viewScale =
       (fieldDim.field_length + fieldDim.boundary_width) / sizeHint().width();
   viewScale = max(viewScale,
@@ -79,7 +86,7 @@ void GLSoccerView::redraw()
 void GLSoccerView::mousePressEvent(QMouseEvent* event)
 {
   leftButton = event->buttons().testFlag(Qt::LeftButton);
-  midButton = event->buttons().testFlag(Qt::MidButton);
+  midButton = event->buttons().testFlag(Qt::MiddleButton);
   rightButton = event->buttons().testFlag(Qt::RightButton);
 
   if(leftButton)
@@ -103,7 +110,7 @@ void GLSoccerView::mouseMoveEvent(QMouseEvent* event)
 {
   static const bool debug = false;
   bool leftButton = event->buttons().testFlag(Qt::LeftButton);
-  bool midButton = event->buttons().testFlag(Qt::MidButton);
+  bool midButton = event->buttons().testFlag(Qt::MiddleButton);
   bool rightButton = event->buttons().testFlag(Qt::RightButton);
 
   if(debug) printf("MouseMove Event, Left:%d Mid:%d Right:%d\n", leftButton?1:0, midButton?1:0, rightButton?1:0);
@@ -161,7 +168,7 @@ void GLSoccerView::resetView()
 
 void GLSoccerView::resizeEvent(QResizeEvent* event)
 {
-  QGLWidget::resizeEvent(event);
+  GL_WIDGET_BASE::resizeEvent(event);
   redraw();
 }
 
@@ -278,7 +285,6 @@ void GLSoccerView::paintEvent(QPaintEvent* event)
   drawBalls();
   //vectorTextTest();
   glPopMatrix();
-  swapBuffers();
   graphicsMutex.unlock();
 }
 

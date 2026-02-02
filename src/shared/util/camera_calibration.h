@@ -26,6 +26,13 @@
 #include <VarList.h>
 #include <quaternion.h>
 
+// Workaround for macOS ObjC macro conflicts with OpenCV
+// Apple's objc.h defines NO and YES which conflict with OpenCV enum values
+#ifdef __APPLE__
+#undef NO
+#undef YES
+#endif
+
 #include <Eigen/Core>
 #include <opencv2/opencv.hpp>
 

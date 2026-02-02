@@ -8,7 +8,21 @@ set(USE_SPINNAKER FALSE CACHE BOOL "Compile with Spinnaker driver (FLIR cameras)
 set(USE_mvIMPACT FALSE CACHE BOOL "Compile with mvImpact driver (bluefox USB2 + USB3 cameras)")
 set(USE_PYLON FALSE CACHE BOOL "Compile with pylon driver (Basler cameras)")
 set(USE_FLYCAP FALSE CACHE BOOL "Compile with flycap driver (FLIR cameras, predecessor of Spinnaker)")
-set(USE_V4L TRUE CACHE BOOL "Compile with Video4Linux support (generic webcams)")
+
+if(APPLE)
+  set(_DEFAULT_USE_V4L FALSE)
+else()
+  set(_DEFAULT_USE_V4L TRUE)
+endif()
+set(USE_V4L ${_DEFAULT_USE_V4L} CACHE BOOL "Compile with Video4Linux support (generic webcams)")
+unset(_DEFAULT_USE_V4L)
+
+if(APPLE)
+  set(USE_AVFOUNDATION TRUE CACHE BOOL "Compile with AVFoundation capture support (macOS cameras)")
+else()
+  set(USE_AVFOUNDATION FALSE CACHE BOOL "Compile with AVFoundation capture support (macOS cameras)")
+endif()
+
 set(USE_SPLITTER FALSE CACHE BOOL "Compile with Camera splitter support (virtual cameras with part of a full image)")
 
 if(USE_DC1394 AND USE_mvIMPACT)
@@ -21,15 +35,62 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_CXX_STANDARD 11)
 
+if(APPLE)
+  set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "macOS architectures" FORCE)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "Minimum macOS version" FORCE)
+  set(CMAKE_MACOSX_RPATH ON)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-deprecated-declarations")
+endif()
+
 # Find third-party libraries
 find_package(OpenGL REQUIRED)
 find_package(Threads REQUIRED)
-find_package(Protobuf REQUIRED)
 find_package(PkgConfig REQUIRED)
-find_package(Eigen3 3.3 REQUIRED NO_MODULE)
-find_package(Qt5Core REQUIRED)
-find_package(Qt5Widgets REQUIRED)
-find_package(Qt5OpenGL REQUIRED)
+find_package(Eigen3 REQUIRED NO_MODULE)
+if(Eigen3_VERSION VERSION_LESS 3.3)
+  message(FATAL_ERROR "Eigen3 3.3 or newer is required; found ${Eigen3_VERSION}")
+endif()
+
+# Fix protobuf library linking (use pkg-config to get abseil dependencies)
+pkg_check_modules(PROTOBUF REQUIRED protobuf)
+set(PROTOBUF_LIBRARIES ${PROTOBUF_LDFLAGS})
+include_directories(${PROTOBUF_INCLUDE_DIRS})
+set(_qt_components Core Widgets OpenGL)
+set(_qt_version 5)
+find_package(Qt${_qt_version} COMPONENTS ${_qt_components} QUIET)
+if(NOT Qt${_qt_version}_FOUND)
+  set(_qt_version 6)
+  find_package(Qt6 COMPONENTS ${_qt_components} OpenGLWidgets REQUIRED)
+endif()
+
+if(_qt_version EQUAL 6)
+  set(QT_PACKAGE Qt6)
+  macro(qt_wrap_cpp)
+    qt6_wrap_cpp(${ARGN})
+  endmacro()
+  macro(qt_wrap_ui)
+    qt6_wrap_ui(${ARGN})
+  endmacro()
+  macro(qt_add_resources)
+    qt6_add_resources(${ARGN})
+  endmacro()
+  set(QT_LIBRARIES ${QT_PACKAGE}::Core ${QT_PACKAGE}::Widgets ${QT_PACKAGE}::OpenGL Qt6::OpenGLWidgets)
+else()
+  set(QT_PACKAGE Qt5)
+  macro(qt_wrap_cpp)
+    qt5_wrap_cpp(${ARGN})
+  endmacro()
+  macro(qt_wrap_ui)
+    qt5_wrap_ui(${ARGN})
+  endmacro()
+  macro(qt_add_resources)
+    qt5_add_resources(${ARGN})
+  endmacro()
+  set(QT_LIBRARIES ${QT_PACKAGE}::Core ${QT_PACKAGE}::Widgets ${QT_PACKAGE}::OpenGL)
+endif()
+
+set(AVFOUNDATION_LIBS "")
+
 # Note: Bluefox SDK is not compatible with some components of OpenCV. Take care when enabling more.
 find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs videoio calib3d)
 
@@ -105,15 +166,40 @@ else()
 	message(STATUS "SPINNAKER disabled")
 endif()
 
-if( USE_V4L )
-	add_definitions( -DV4L )
-	set (SHARED_SRCS ${SHARED_SRCS} ${shared_dir}/capture/capturev4l.cpp)
-	set (SHARED_HEADERS ${SHARED_HEADERS} ${shared_dir}/capture/capturev4l.h)
-	message(STATUS "Video 4 Linux enabled")
-  set(V4L_LIBS jpeg)
-else()
-	message(STATUS "Video 4 Linux disabled")
-  set(V4L_LIBS)
+if(USE_V4L)
+    add_definitions(-DV4L)
+    set (SHARED_SRCS ${SHARED_SRCS}
+        ${shared_dir}/capture/capturev4l.cpp
+        )
+    set (SHARED_HEADERS ${SHARED_HEADERS}
+        ${shared_dir}/capture/capturev4l.h
+        )
+    if(APPLE)
+      message(FATAL_ERROR "USE_V4L is not supported on macOS. Disable it or build on Linux.")
+    else()
+      pkg_check_modules(V4L REQUIRED libv4l2)
+      include_directories(${V4L_INCLUDE_DIRS})
+      set(V4L_LIBS ${V4L_LIBS} ${V4L_LIBRARIES})
+    endif()
+endif()
+
+if(APPLE AND USE_AVFOUNDATION)
+  add_definitions(-DAVFOUNDATION_CAPTURE)
+  find_library(AVFOUNDATION_FRAMEWORK AVFoundation REQUIRED)
+  find_library(COREMEDIA_FRAMEWORK CoreMedia REQUIRED)
+  find_library(COREVIDEO_FRAMEWORK CoreVideo REQUIRED)
+  find_library(QUARTZCORE_FRAMEWORK QuartzCore REQUIRED)
+  find_library(APPSERVICES_FRAMEWORK ApplicationServices REQUIRED)
+  set(AVFOUNDATION_LIBS
+      ${AVFOUNDATION_FRAMEWORK}
+      ${COREMEDIA_FRAMEWORK}
+      ${COREVIDEO_FRAMEWORK}
+      ${QUARTZCORE_FRAMEWORK}
+      ${APPSERVICES_FRAMEWORK})
+  set(SHARED_SRCS ${SHARED_SRCS}
+      ${shared_dir}/capture/capture_avfoundation.mm)
+  set(SHARED_HEADERS ${SHARED_HEADERS}
+      ${shared_dir}/capture/capture_avfoundation.h)
 endif()
 
 if( USE_SPLITTER )
@@ -176,11 +262,9 @@ set (SRCS ${SRCS}
 	src/app/stacks/multivisionstack.cpp
 	src/app/stacks/stack_robocup_ssl.cpp
 	src/app/stacks/visionstack.cpp
-
-	${OPTIONAL_SRCS}
 )
 
-qt5_wrap_cpp (MOC_SRCS
+qt_wrap_cpp (MOC_SRCS
 	src/app/capture_thread.h
 
 	src/app/gui/maskwidget.h
@@ -193,9 +277,6 @@ qt5_wrap_cpp (MOC_SRCS
 	src/app/gui/mainwindow.h
 	src/app/gui/videowidget.h
 	src/app/gui/jog_dial.h
-
-	src/shared/util/lut3d.h
-	src/shared/util/convex_hull_image_mask.h
 
 	src/app/plugins/plugin_dvr.h
 	src/app/plugins/plugin_publishgeometry.h
@@ -213,28 +294,28 @@ qt5_wrap_cpp (MOC_SRCS
 	${OPTIONAL_HEADERS}
 )
 
-qt5_wrap_ui (UI_SRCS
+qt_wrap_ui (UI_SRCS
 	src/app/gui/mainwindow.ui
 	src/app/gui/videowidget.ui
 	${OPTIONAL_UI_SRCS}
 )
 
-qt5_add_resources(RC_SRCS
+qt_add_resources(RC_SRCS
 	src/app/gui/icons/icons_gui.qrc
 	${SHARED_RC}
 )
 
 ## generate moc files for graphicalClient
-qt5_wrap_cpp(GCLIENT_MOC_SRCS
-    src/graphicalClient/soccerview.h
+qt_wrap_cpp(GCLIENT_MOC_SRCS
+	src/graphicalClient/soccerview.h
 )
 
 ## shared qt wrappings
-qt5_wrap_cpp (SHARED_MOC_SRCS
+qt_wrap_cpp (SHARED_MOC_SRCS
 	${SHARED_HEADERS}
 )
 
-qt5_add_resources(SHARED_RC_SRCS
+qt_add_resources(SHARED_RC_SRCS
 	${SHARED_RC}
 )
 
@@ -242,10 +323,18 @@ qt5_add_resources(SHARED_RC_SRCS
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-deprecated-declarations")
 
 #flags to set in debug mode
-set (CMAKE_CXX_FLAGS_DEBUG "-g -Wl,--no-as-needed")
+if(NOT APPLE)
+  set (CMAKE_CXX_FLAGS_DEBUG "-g -Wl,--no-as-needed")
+else()
+  set (CMAKE_CXX_FLAGS_DEBUG "-g")
+endif()
 
 #flags to set in release mode
-set (CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3 -march=native -Wl,--no-as-needed")
+if(NOT APPLE)
+  set (CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3 -march=native -Wl,--no-as-needed")
+else()
+  set (CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3 -march=native")
+endif()
 
 ## build the common code
 add_library(sslvision ${SHARED_MOC_SRCS} ${SHARED_RC_SRCS} ${CC_PROTO} ${SHARED_SRCS})
@@ -264,18 +353,23 @@ set (libs
   ${FLYCAP_LIBS}
   ${SPINNAKER_LIBS}
   ${V4L_LIBS}
+  ${AVFOUNDATION_LIBS}
   Eigen3::Eigen
 )
-target_link_libraries(sslvision ${libs} Qt5::Widgets)
+target_link_libraries(sslvision ${libs} ${QT_PACKAGE}::Widgets)
 set (libs ${libs} sslvision)
 
 ## build the main app
 add_executable(vision ${UI_SRCS} ${MOC_SRCS} ${RC_SRCS} ${SRCS})
-target_link_libraries(vision ${libs} Qt5::Widgets Qt5::OpenGL)
+if(_qt_version EQUAL 6)
+  target_link_libraries(vision ${libs} ${QT_PACKAGE}::Widgets ${QT_PACKAGE}::OpenGL Qt6::OpenGLWidgets)
+else()
+  target_link_libraries(vision ${libs} ${QT_PACKAGE}::Widgets ${QT_PACKAGE}::OpenGL)
+endif()
 
 ## build non graphical client
 add_executable(client src/client/main.cpp )
-target_link_libraries(client ${libs} Qt5::Core)
+target_link_libraries(client ${libs} ${QT_PACKAGE}::Core)
 
 ## build graphical client
 add_executable(graphicalClient ${GCLIENT_MOC_SRCS}
@@ -283,4 +377,4 @@ add_executable(graphicalClient ${GCLIENT_MOC_SRCS}
   src/graphicalClient/soccerview.cpp
   src/graphicalClient/gltext.cpp
 )
-target_link_libraries(graphicalClient ${libs} Qt5::Widgets Qt5::OpenGL)
+target_link_libraries(graphicalClient ${libs} ${QT_PACKAGE}::Widgets ${QT_PACKAGE}::OpenGL)

@@ -25,6 +25,7 @@
 #include <QString>
 #include <QStringList>
 #include <QMap>
+#include <list>
 #include <utility>
 
 class GetOpt {

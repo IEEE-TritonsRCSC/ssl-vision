@@ -78,6 +78,13 @@ CaptureThread::CaptureThread(int cam_id)
   captureV4L = new CaptureV4L(v4l, camId);
 #endif
 
+#ifdef AVFOUNDATION_CAPTURE
+  captureModule->addItem("AVFoundation");
+  avfoundation = new VarList("AVFoundation");
+  settings->addChild(avfoundation);
+  captureAVFoundation = new CaptureAVFoundation(avfoundation);
+#endif
+
 #ifdef PYLON
   captureModule->addItem("Basler GigE");
   basler = new VarList("Basler GigE");
@@ -177,6 +184,10 @@ CaptureThread::~CaptureThread()
 #ifdef CAMERA_SPLITTER
   delete captureSplitter;
 #endif
+
+#ifdef AVFOUNDATION_CAPTURE
+  delete captureAVFoundation;
+#endif
 }
 
 void CaptureThread::setFrameBuffer(FrameBuffer * _rb) {
@@ -240,6 +251,11 @@ void CaptureThread::selectCaptureMethod() {
 #ifdef CAMERA_SPLITTER
   else if(captureModule->getString() == "Splitter") {
     new_capture = captureSplitter;
+  }
+#endif
+#ifdef AVFOUNDATION_CAPTURE
+  else if(captureModule->getString() == "AVFoundation") {
+    new_capture = captureAVFoundation;
   }
 #endif
 

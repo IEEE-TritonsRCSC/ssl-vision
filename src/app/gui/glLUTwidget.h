@@ -20,7 +20,18 @@
 //========================================================================
 #ifndef GLLUTWIDGET_H_
 #define GLLUTWIDGET_H_
+
+#include <QtGlobal>
+
+// Qt6 compatibility: QOpenGLWidget replaces QGLWidget
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#include <QtOpenGLWidgets/QOpenGLWidget>
+#define GL_WIDGET_BASE QOpenGLWidget
+#else
 #include <QtOpenGL/QGLWidget>
+#define GL_WIDGET_BASE QGLWidget
+#endif
+
 #include <QTime>
 #include <QMutex>
 #include <QWheelEvent>
@@ -50,7 +61,7 @@ using namespace std;
   \brief   An OpenGL-based editor for 3D Color LUTs of type LUT3D
   \author  Stefan Zickler, (C) 2008
 */
-class GLLUTWidget : public QGLWidget, public RealTimeDisplayWidget
+class GLLUTWidget : public GL_WIDGET_BASE, public RealTimeDisplayWidget
 {
   Q_OBJECT
   enum ViewMode {
@@ -211,7 +222,7 @@ public:
 
   void setObjectName(const QString & s)
   {
-    QGLWidget::setObjectName(s);
+    GL_WIDGET_BASE::setObjectName(s);
   }
 
   void sampleImage(const RawImage & img, ConvexHullImageMask & mask);
@@ -247,7 +258,11 @@ public:
 public slots:
   virtual void redraw()
   {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    update();
+#else
     updateGL();
+#endif
   }
 
 public slots:

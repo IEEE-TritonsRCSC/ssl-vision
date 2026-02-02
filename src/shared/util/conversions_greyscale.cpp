@@ -43,15 +43,15 @@ void ConversionsGreyscale::cvColor2Grey(const RawImage &src, Image<raw8> *dst) {
 }
 
 void ConversionsGreyscale::cvColor2Grey(const RawImage &src, const int src_data_format, Image<raw8> *dst,
-                                        const cv::ColorConversionCodes conversion_code) {
-  cv::Mat srcMat(src.getWidth(), src.getHeight(), src_data_format, src.getData());
-  cv::Mat dstMat(dst->getWidth(), dst->getHeight(), CV_8UC1, dst->getData());
+                                         const cv::ColorConversionCodes conversion_code) {
+  cv::Mat srcMat(src.getHeight(), src.getWidth(), src_data_format, src.getData());
+  cv::Mat dstMat(dst->getHeight(), dst->getWidth(), CV_8UC1, dst->getData());
   cv::cvtColor(srcMat, dstMat, conversion_code);
 }
 
 void ConversionsGreyscale::cv16bit2_8bit(const RawImage &src, Image<raw8> *dst) {
-  cv::Mat srcMat(src.getWidth(), src.getHeight(), CV_16UC1, src.getData());
-  cv::Mat dstMat(dst->getWidth(), dst->getHeight(), CV_8UC1, dst->getData());
+  cv::Mat srcMat(src.getHeight(), src.getWidth(), CV_16UC1, src.getData());
+  cv::Mat dstMat(dst->getHeight(), dst->getWidth(), CV_8UC1, dst->getData());
   // convertTo drops higher bits. Need to rescale 16 bit values to
   // 8bit range. Should have a scale factor of 1/256. See
   // https://stackoverflow.com/a/10420743
@@ -68,7 +68,7 @@ void ConversionsGreyscale::manualColor2Grey(const RawImage &src, Image<raw8> *ds
 }
 
 void ConversionsGreyscale::copyData(const RawImage &src, Image<raw8> *dst) {
-  cv::Mat srcMat(src.getWidth(), src.getHeight(), CV_8UC1, src.getData());
-  cv::Mat dstMat(dst->getWidth(), dst->getHeight(), CV_8UC1, dst->getData());
+  cv::Mat srcMat(src.getHeight(), src.getWidth(), CV_8UC1, src.getData());
+  cv::Mat dstMat(dst->getHeight(), dst->getWidth(), CV_8UC1, dst->getData());
   srcMat.copyTo(dstMat);
 }

@@ -25,9 +25,11 @@
 #include <string.h>
 #include <vector>
 #include <unistd.h>
+#ifdef __linux__
 #include <asm/unistd.h>
 #include <syscall.h>
 #include <sched.h>
+#endif
 #include "pthread.h"
 #define DT_LOCK pthread_mutex_lock((pthread_mutex_t*)_mutex);
 #define DT_UNLOCK pthread_mutex_unlock((pthread_mutex_t*)_mutex);

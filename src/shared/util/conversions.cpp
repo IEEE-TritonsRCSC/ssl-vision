@@ -59,8 +59,8 @@ void Conversions::rgb482rgb ( unsigned char *src,
                               int width,
                               int height ) {
   int NumPixels = width*height;
-  register int i = ( ( NumPixels + ( NumPixels << 1 ) ) << 1 )-1;
-  register int j = NumPixels + ( NumPixels << 1 ) -1;
+  int i = ( ( NumPixels + ( NumPixels << 1 ) ) << 1 )-1;
+  int j = NumPixels + ( NumPixels << 1 ) -1;
 
   while ( i > 0 ) {
     i--;
@@ -78,9 +78,9 @@ void Conversions::uyv2rgb ( unsigned char *src,
                             int width,
                             int height ) {
   int NumPixels = width*height;
-  register int i = NumPixels + ( NumPixels << 1 ) -1;
-  register int j = NumPixels + ( NumPixels << 1 ) -1;
-  register int y, u, v;
+  int i = NumPixels + ( NumPixels << 1 ) -1;
+  int j = NumPixels + ( NumPixels << 1 ) -1;
+  int y, u, v;
   int r, g, b;
 
 
@@ -106,12 +106,12 @@ void Conversions::uyvy2rgb ( unsigned char *src,
   
   int NumPixels = width*height;
                              
-  register int max_i = ( NumPixels << 1 )-1;
-  //register int max_j = NumPixels + ( NumPixels << 1 ) -1;
-  register int i = 0;
-  register int j = 0;
-  register int y0, y1, u, v;
-  register int r, g, b;
+  int max_i = ( NumPixels << 1 )-1;
+  //int max_j = NumPixels + ( NumPixels << 1 ) -1;
+  int i = 0;
+  int j = 0;
+  int y0, y1, u, v;
+  int r, g, b;
 
   while ( i < max_i ) {
     u  = ( unsigned char ) src[i++] - 128;
@@ -141,12 +141,12 @@ void Conversions::yuyv2rgb ( unsigned char *src,
     
     int NumPixels = width*height;
     
-    register int max_i = ( NumPixels << 1 )-1;
-    //register int max_j = NumPixels + ( NumPixels << 1 ) -1;
-    register int i = 0;
-    register int j = 0;
-    register int y0, y1, u, v;
-    register int r, g, b;
+    int max_i = ( NumPixels << 1 )-1;
+    //int max_j = NumPixels + ( NumPixels << 1 ) -1;
+    int i = 0;
+    int j = 0;
+    int y0, y1, u, v;
+    int r, g, b;
     
     while ( i < max_i ) {
         y0 = ( unsigned char ) src[i++];
@@ -175,12 +175,12 @@ void Conversions::rgb2uyvy (unsigned char *src, unsigned char *dest, int width, 
     
     int NumPixels = width*height;
     
-    register int max_i = ( NumPixels << 1 )-1;
-    //register int max_j = NumPixels + ( NumPixels << 1 ) -1;
-    register int i = 0;
-    register int j = 0;
-    register int y0, y1, u, v;
-    register int r, g, b;
+    int max_i = ( NumPixels << 1 )-1;
+    //int max_j = NumPixels + ( NumPixels << 1 ) -1;
+    int i = 0;
+    int j = 0;
+    int y0, y1, u, v;
+    int r, g, b;
     
     while ( i < max_i ) {
         r = ( unsigned char ) src[i++];
@@ -209,12 +209,12 @@ void Conversions::rgb2yuyv (unsigned char *src, unsigned char *dest, int width, 
     
     int NumPixels = width*height;
     
-    register int max_i = ( NumPixels << 1 )-1;
-    //register int max_j = NumPixels + ( NumPixels << 1 ) -1;
-    register int i = 0;
-    register int j = 0;
-    register int y0, y1, u, v;
-    register int r, g, b;
+    int max_i = ( NumPixels << 1 )-1;
+    //int max_j = NumPixels + ( NumPixels << 1 ) -1;
+    int i = 0;
+    int j = 0;
+    int y0, y1, u, v;
+    int r, g, b;
     
     while ( i < max_i ) {
         r = ( unsigned char ) src[i++];
@@ -240,9 +240,9 @@ void Conversions::uyvy2bgr ( unsigned char *src,
 
   int NumPixels = width*height;
 
-  register int i = ( NumPixels << 1 )-1;
-  register int j = NumPixels + ( NumPixels << 1 ) -1;
-  register int y0, y1, u, v;
+  int i = ( NumPixels << 1 )-1;
+  int j = NumPixels + ( NumPixels << 1 ) -1;
+  int y0, y1, u, v;
   int r, g, b;
 
   while ( i > 0 ) {
@@ -267,9 +267,9 @@ void Conversions::uyyvyy2rgb ( unsigned char *src,
                                int height ) {
 
   int NumPixels = width*height;
-  register int i = NumPixels + ( NumPixels >> 1 )-1;
-  register int j = NumPixels + ( NumPixels << 1 )-1;
-  register int y0, y1, y2, y3, u, v;
+  int i = NumPixels + ( NumPixels >> 1 )-1;
+  int j = NumPixels + ( NumPixels << 1 )-1;
+  int y0, y1, y2, y3, u, v;
   int r, g, b;
 
   while ( i > 0 ) {
@@ -303,9 +303,9 @@ void Conversions::y2rgb ( unsigned char *src,
                           int width,
                           int height ) {
   int NumPixels = width*height;
-  register int i = NumPixels-1;
-  register int j = NumPixels + ( NumPixels << 1 )-1;
-  register int y;
+  int i = NumPixels-1;
+  int j = NumPixels + ( NumPixels << 1 )-1;
+  int y;
 
   while ( i > 0 ) {
     y = ( unsigned char ) src[i--];
@@ -321,9 +321,9 @@ void Conversions::y162rgb ( unsigned char *src,
                             int height,
                             int bits ) {
   int NumPixels = width*height;
-  register int i = ( NumPixels << 1 )-1;
-  register int j = NumPixels + ( NumPixels << 1 )-1;
-  register int y;
+  int i = ( NumPixels << 1 )-1;
+  int j = NumPixels + ( NumPixels << 1 )-1;
+  int y;
 
   while ( i > 0 ) {
     y = src[i--];

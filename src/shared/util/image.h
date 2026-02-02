@@ -417,10 +417,10 @@ void drawFatLine (int x0, int y0, int x1, int y1 , PIXEL val)
 
   void subtract(const Image &source) {
     if (source.getNumPixels()==getNumPixels()) {
-      register PIXEL * a=getPixelData();
-      register PIXEL * b=source.getData();
-      register unsigned int i;
-      register unsigned int pixelCount=getNumPixels();
+      PIXEL * a=getPixelData();
+      PIXEL * b=source.getData();
+      unsigned int i;
+      unsigned int pixelCount=getNumPixels();
       for (i=0;i<pixelCount;i++) {
         (*a)-=(*b);
         a++;
@@ -430,9 +430,9 @@ void drawFatLine (int x0, int y0, int x1, int y1 , PIXEL val)
   }
 
   void convertToIntensity() {
-      register PIXEL * a=getPixelData();
-      register unsigned int i;
-      register unsigned int pixelCount=getNumPixels();
+      PIXEL * a=getPixelData();
+      unsigned int i;
+      unsigned int pixelCount=getNumPixels();
       for (i=0;i<pixelCount;i++) {
         a->r = a->g = a->b = a->getIntensity();
         a++;
@@ -440,9 +440,9 @@ void drawFatLine (int x0, int y0, int x1, int y1 , PIXEL val)
   }
 
   void binarizeGreyImage(unsigned int threshold) {
-      register PIXEL * a=getPixelData();
-      register unsigned int i;
-      register unsigned int pixelCount=getNumPixels();
+      PIXEL * a=getPixelData();
+      unsigned int i;
+      unsigned int pixelCount=getNumPixels();
       for (i=0;i<pixelCount;i++) {
         if (a->r > threshold) {a->r = 255; } else {a->r=0; };
         a->g=a->b=a->r;
@@ -452,9 +452,9 @@ void drawFatLine (int x0, int y0, int x1, int y1 , PIXEL val)
 
 
   void binarizeChanneledImage(unsigned int threshold_r,unsigned int threshold_g,unsigned int threshold_b) {
-      register PIXEL * a=getPixelData();
-      register unsigned int i;
-      register unsigned int pixelCount=getNumPixels();
+      PIXEL * a=getPixelData();
+      unsigned int i;
+      unsigned int pixelCount=getNumPixels();
       for (i=0;i<pixelCount;i++) {
         if (a->r > threshold_r) {a->r = 255; } else {a->r=0; };
         if (a->g > threshold_g) {a->g = 255; } else {a->g=0; };

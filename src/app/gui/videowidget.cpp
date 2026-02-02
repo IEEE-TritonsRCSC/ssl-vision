@@ -80,7 +80,7 @@ VideoWidget::VideoWidget(QString title, QWidget * vis)
     //reverse the list so the icons appear in the right order:
     // (qt really needs a list.reverse() function....)
     for (int i=0;i<toolactions.size()/2;i++) {
-      toolactions.swap(i,toolactions.size()-(i+1));
+      std::swap(toolactions[i], toolactions[toolactions.size()-(i+1)]);
     }
 
     //add the actions to the toolbar

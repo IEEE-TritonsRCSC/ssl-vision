@@ -21,10 +21,22 @@
 
 #include <QMouseEvent>
 #include <QWidget>
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#include <QOpenGLWidget>
+#else
 #include <QGLWidget>
+#endif
+
 #include <QMutex>
 #include <QVector>
+
+#ifdef __APPLE__
+#include <OpenGL/glu.h>
+#else
 #include <GL/glu.h>
+#endif
+
 #include <math.h>
 #include <float.h>
 #include <stdio.h>
@@ -41,10 +53,16 @@
 
 using namespace std;
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+using GL_WIDGET_BASE = QOpenGLWidget;
+#else
+using GL_WIDGET_BASE = QGLWidget;
+#endif
+
 #define FIELD_COLOR 0.0,0.5686,0.0980,1.0
 #define FIELD_LINES_COLOR 1.0,1.0,1.0,1.0
 
-class GLSoccerView : public QGLWidget{
+class GLSoccerView : public GL_WIDGET_BASE{
   Q_OBJECT
 
 public:

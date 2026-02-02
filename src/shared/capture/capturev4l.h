@@ -41,8 +41,12 @@
 #include <cstdlib>
 #include <string>
 #include "VarTypes.h"
+
+#ifdef __linux__
 #include <linux/videodev2.h>
 #include <sys/poll.h>
+#endif
+
 #include <jpeglib.h>
 
 #include <map>
@@ -61,11 +65,13 @@ typedef long v4lfeature_t;
 // place-holder for friend relationship
 class GlobalV4LinstanceManager;
 
+#ifdef __linux__
+
 /*!
- \class GlobalV4Linstance
- \brief A singleton provider of a v4l lib context used for capturing with multiple threads
- \author  Eric Zavesky, (C) 2016 (derived from DC1394 interface)
- */
+  \class GlobalV4Linstance
+  \brief A singleton provider of a v4l lib context used for capturing with multiple threads
+  \author  Eric Zavesky, (C) 2016 (derived from DC1394 interface)
+  */
 class GlobalV4Linstance {
     friend class GlobalV4LinstanceManager;
 
@@ -312,4 +318,6 @@ private:
     void writeAllParameterValues();
 };
 
-#endif
+#endif // __linux__
+
+#endif // CAPTUREV4l_H

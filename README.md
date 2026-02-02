@@ -28,10 +28,28 @@ Following dependencies are required to build the software:
  * OpenCV >= 3
  * libdc1394 Version >= 2.0
  * video for linux 2 (v4l)
+* AVFoundation (macOS cameras via `-DUSE_AVFOUNDATION=true`)
 
 To get all of these packages in (k)ubuntu, run the `InstallPackagesUbuntu.sh` script.
 
 Or, in archlinux, run the `InstallPackagesArch.sh` script.
+
+On macOS 15+ (Apple Silicon) use `InstallPackagesMac.sh` to install the Homebrew-based dependency set (CMake, Eigen, Qt, OpenCV, libdc1394, etc.). The script warns that `qt@5` is scheduled for removal in May 2026; Qt 6 support can be enabled automatically by `cmake` when Qt 5 is unavailable.
+
+### Configuring across multiple machines
+
+When switching between different checkouts (e.g., Linux CI path vs. local macOS path) the existing CMake cache may point at the old source directory, triggering errors like:
+
+```
+CMake Error: The current CMakeCache.txt directory … is different than the directory … where CMakeCache.txt was created.
+```
+
+Use `scripts/configure.sh` instead of invoking `cmake -B build` directly. The helper script checks the `CMAKE_HOME_DIRECTORY` stored in `build/CMakeCache.txt` and automatically wipes the build directory if it does not match the current checkout, ensuring cache consistency across machines:
+
+```
+./scripts/configure.sh -DUSE_AVFOUNDATION=ON
+cmake --build build
+```
 
 ## Test data
 
@@ -61,6 +79,10 @@ Then build with the corresponding option:
  
 Example for a release build: `cmake -B build -DUSE_SPINNAKER=true`.
  As these are cached cmake options, you only need to run this once and can build with `make` afterwards.
+
+### macOS capture notes
+
+AVFoundation capture ships as the default webcam backend on macOS when building with `-DUSE_AVFOUNDATION=true` (enabled automatically on Apple builds). It enumerates hardware cameras exposed by the OS and mirrors the same capture controls as other modules. V4L remains Linux-only and will hard-error if enabled on macOS.
 
 ### Virtual Splitter cameras
 

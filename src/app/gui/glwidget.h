@@ -21,8 +21,17 @@
 #ifndef GLWIDGET_H_
 #define GLWIDGET_H_
 
+#include <QtGlobal>
 
+// Qt6 compatibility: QOpenGLWidget replaces QGLWidget
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#include <QtOpenGLWidgets/QOpenGLWidget>
+#define GL_WIDGET_BASE QOpenGLWidget
+#else
 #include <QtOpenGL/QGLWidget>
+#define GL_WIDGET_BASE QGLWidget
+#endif
+
 #include <QTime>
 #include <QMutex>
 #include <QWheelEvent>
@@ -47,7 +56,7 @@
   \brief   An OpenGL-based real-time video display widget
   \author  Stefan Zickler, (C) 2008
 */
-class GLWidget : public QGLWidget, public RealTimeDisplayWidget
+class GLWidget : public GL_WIDGET_BASE, public RealTimeDisplayWidget
 {
   Q_OBJECT
 
@@ -102,7 +111,7 @@ public:
   }
   void setObjectName(const QString & s)
   {
-    QGLWidget::setObjectName(s);
+    GL_WIDGET_BASE::setObjectName(s);
   }
   GLWidget(QWidget *parent = 0, bool allow_qpainter_overlay=true);
   virtual ~GLWidget();
@@ -167,7 +176,11 @@ public:
     if (ALLOW_QPAINTER) {
       repaint();
     } else {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+      update();
+#else
       updateGL();
+#endif
     }
   }
 

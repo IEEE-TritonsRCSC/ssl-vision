@@ -370,7 +370,7 @@ void GLLUTWidget::mouseMoveEvent ( QMouseEvent * event )
 }
 
 
-GLLUTWidget::GLLUTWidget(LUTChannelMode mode, QWidget *parent) : QGLWidget(parent)
+GLLUTWidget::GLLUTWidget(LUTChannelMode mode, QWidget *parent) : GL_WIDGET_BASE(parent)
 {
   rb=0;
   _lut=0;
@@ -520,7 +520,7 @@ GLLUTWidget::~GLLUTWidget()
 
 void GLLUTWidget::initializeGL()
 {
-  qglClearColor(QColor(0,0,0));
+  glClearColor(0.0, 0.0, 0.0, 1.0);
   //DISABLE EVERYTHING
   //trying to make video-rendering as fast as possible
   //glShadeModel(GL_FLAT);

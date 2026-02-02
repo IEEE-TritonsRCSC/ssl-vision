@@ -22,7 +22,7 @@
 #ifndef __GVECTOR_H__
 #define __GVECTOR_H__
 
-#include <math.h>
+#include <cmath>
 #include "util.h"
 
 #define V3COMP(p) p.x,p.y,p.z
@@ -107,7 +107,7 @@ public:
   //vector3d<num> shortest_axis(const vector3d<num> a,const vector3d<num> b);
 
   bool finite() const MustUseResult
-    {return(::finite(x) && ::finite(y) && ::finite(z));}
+    {return(std::isfinite(x) && std::isfinite(y) && std::isfinite(z));}
 
   void take_min(const vector3d<num> p);
   void take_max(const vector3d<num> p);
@@ -627,7 +627,7 @@ public:
 
   /// return true if both elements are finite, otherwise return false
   bool finite() const MustUseResult
-    {return(::finite(x) && ::finite(y));}
+    {return(std::isfinite(x) && std::isfinite(y));}
 
   /// set the vector to the minimum of its components and p's components
   void take_min(const vector2d<num> p);

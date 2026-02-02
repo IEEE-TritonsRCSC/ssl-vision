@@ -101,7 +101,7 @@ public:
     this->conf = conf;    
   }
 
-  bool operator< (BallDetectResult a) {
+  bool operator< (const BallDetectResult& a) const {
     return conf < a.conf;
   }
 };
