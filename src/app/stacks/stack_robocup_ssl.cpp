@@ -103,7 +103,6 @@ StackRoboCupSSL::StackRoboCupSSL(
   PluginVisualize * vis = new PluginVisualize(_fb,*camera_parameters,*global_field, *_image_mask);
   vis->setThresholdingLUT(lut_yuv);
   vis->setCalibrationPlugin(calib);
-  calib->setVisualizePlugin(vis);
   stack.push_back(vis);
 }
 string StackRoboCupSSL::getSettingsFileName() {
@@ -113,4 +112,3 @@ StackRoboCupSSL::~StackRoboCupSSL() {
   delete lut_yuv;
   delete camera_parameters;
 }
-

@@ -22,7 +22,6 @@
 
 #include "cameracalibwidget.h"
 #include "plugin_cameracalib.h"
-#include "plugin_visualize.h"
 #include <QCheckBox>
 #include <QVBoxLayout>
 #include <QGridLayout>
@@ -34,7 +33,8 @@
 #include <QLineEdit>
 #include <iostream>
 
-CameraCalibrationWidget::CameraCalibrationWidget(CameraParameters &_cp) : camera_parameters(_cp), detectEdges(false), calibrationPlugin(nullptr), visualizePlugin(nullptr)
+CameraCalibrationWidget::CameraCalibrationWidget(CameraParameters &_cp)
+    : camera_parameters(_cp), detectEdges(false), calibrationPlugin(nullptr)
 {
   QTabWidget* tabWidget = new QTabWidget(this);
 
@@ -188,12 +188,6 @@ CameraCalibrationWidget::CameraCalibrationWidget(CameraParameters &_cp) : camera
   customCalibrationModeCheckBox = new QCheckBox("Custom Calibration Mode");
   customCalibrationModeCheckBox->setChecked(false);
   connect(customCalibrationModeCheckBox, SIGNAL(stateChanged(int)), SLOT(customCalibrationModeToggled(int)));
-
-  customCalibrationUseCameraModelCheckBox =
-      new QCheckBox("Account for camera distortion/perspective");
-  customCalibrationUseCameraModelCheckBox->setChecked(true);
-  connect(customCalibrationUseCameraModelCheckBox, SIGNAL(stateChanged(int)),
-          SLOT(customCalibrationUseCameraModelToggled(int)));
   
   customCalibStatus = new QLabel("Status: 0/4 points set");
   customCalibStatus->setStyleSheet("QLabel { font-weight: bold; }");
@@ -201,21 +195,15 @@ CameraCalibrationWidget::CameraCalibrationWidget(CameraParameters &_cp) : camera
   QGroupBox* actionButtonsBox = new QGroupBox(tr("Actions"));
   customCalibResetButton = new QPushButton(tr("Reset Points"));
   connect(customCalibResetButton, SIGNAL(clicked()), SLOT(customCalibResetClicked()));
-
-  customBoundariesCheckBox = new QCheckBox(tr("Show Custom Boundaries"));
-  customBoundariesCheckBox->setChecked(false);
-  connect(customBoundariesCheckBox, SIGNAL(stateChanged(int)), SLOT(customBoundariesToggled(int)));
   
   auto actionButtonsLayout = new QVBoxLayout;
   actionButtonsLayout->addWidget(customCalibResetButton);
-  actionButtonsLayout->addWidget(customBoundariesCheckBox);
   actionButtonsBox->setLayout(actionButtonsLayout);
   
   // Custom calibration tab layout:
   QVBoxLayout *customVbox = new QVBoxLayout;
   customVbox->addWidget(instructionsLabel);
   customVbox->addWidget(customCalibrationModeCheckBox);
-  customVbox->addWidget(customCalibrationUseCameraModelCheckBox);
   customVbox->addWidget(customCalibStatus);
   customVbox->addWidget(actionButtonsBox);
   customVbox->addStretch(1);
@@ -374,12 +362,6 @@ void CameraCalibrationWidget::customCalibrationModeToggled(int state) {
   }
 }
 
-void CameraCalibrationWidget::customCalibrationUseCameraModelToggled(int state) {
-  if (calibrationPlugin) {
-    calibrationPlugin->setCustomCalibrationUseCameraModel(state == Qt::Checked);
-  }
-}
-
 void CameraCalibrationWidget::customCalibResetClicked() {
   if (calibrationPlugin) {
     calibrationPlugin->resetCustomCalibration();
@@ -391,24 +373,5 @@ void CameraCalibrationWidget::updateCustomCalibStatus() {
   if (calibrationPlugin) {
     int count = calibrationPlugin->getCustomCalibrationPointCount();
     customCalibStatus->setText(QString("Status: %1/4 points set").arg(count));
-  }
-}
-
-void CameraCalibrationWidget::customBoundariesToggled(int state) {
-  if (visualizePlugin) {
-    VarTypes::VarBool* var = visualizePlugin->getCustomBoundariesVar();
-    if (var) {
-      var->setBool(state == Qt::Checked);
-    }
-  }
-}
-
-void CameraCalibrationWidget::setVisualizePlugin(PluginVisualize* plugin) {
-  visualizePlugin = plugin;
-  if (visualizePlugin) {
-    VarTypes::VarBool* var = visualizePlugin->getCustomBoundariesVar();
-    if (var) {
-      customBoundariesCheckBox->setChecked(var->getBool());
-    }
   }
 }

@@ -30,7 +30,13 @@ void GLWidget::mouseAction ( QMouseEvent * event, pixelloc loc ) {
   (void)loc;
   if ( ( event->buttons() & Qt::RightButton ) !=0 ) {
     //Right mouse button...drag image
-    QPoint offset=mouseStart-event->pos();
+    QPoint pos =
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+      event->position().toPoint();
+#else
+      event->pos();
+#endif
+    QPoint offset=mouseStart-pos;
     zoom.setPan ( mouseStartPanX- ( ( double ) offset.x() / ( zoom.getZoom() * zoom.getFlipXval() * vpW ) ),
                   mouseStartPanY- ( ( double ) offset.y() / ( zoom.getZoom() * zoom.getFlipYval() * vpH ) ) );
   } /* else if ( ( event->buttons() & Qt::LeftButton ) !=0 ) {
@@ -58,10 +64,16 @@ void GLWidget::mouseAction ( QMouseEvent * event, pixelloc loc ) {
 }
 
 void GLWidget::mousePressEvent ( QMouseEvent * event ) {
+  QPoint pos =
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    event->position().toPoint();
+#else
+    event->pos();
+#endif
   std::cout << "[GLWidget] mousePressEvent received, buttons=" << event->buttons()
-            << ", pos=(" << event->pos().x() << "," << event->pos().y() << ")" << std::endl;
+            << ", pos=(" << pos.x() << "," << pos.y() << ")" << std::endl;
   event->setAccepted ( false );
-  pixelloc loc=zoom.invZoom ( event->pos().x(),event->pos().y(),true );
+  pixelloc loc=zoom.invZoom ( pos.x(),pos.y(),true );
   std::cout << "[GLWidget] Stack pointer: " << (stack != 0 ? "VALID" : "NULL") << std::endl;
   if ( stack!=0 ) {
     stack->mousePressEvent ( event,loc );
@@ -69,17 +81,23 @@ void GLWidget::mousePressEvent ( QMouseEvent * event ) {
               << (event->isAccepted() ? "TRUE" : "FALSE") << std::endl;
   }
   if ( event->isAccepted() ==true ) return;
-  mouseStart=event->pos();
+  mouseStart=pos;
   mouseStartPanX=zoom.getPanX();
   mouseStartPanY=zoom.getPanY();
   mouseAction ( event,loc );
 }
 
 void GLWidget::mouseReleaseEvent ( QMouseEvent * event ) {
+  QPoint pos =
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    event->position().toPoint();
+#else
+    event->pos();
+#endif
   std::cout << "[GLWidget] mouseReleaseEvent received, buttons=" << event->buttons()
-            << ", pos=(" << event->pos().x() << "," << event->pos().y() << ")" << std::endl;
+            << ", pos=(" << pos.x() << "," << pos.y() << ")" << std::endl;
   event->setAccepted ( false );
-  pixelloc loc=zoom.invZoom ( event->pos().x(),event->pos().y(),true );
+  pixelloc loc=zoom.invZoom ( pos.x(),pos.y(),true );
   if ( stack!=0 ) {
     stack->mouseReleaseEvent ( event,loc );
     std::cout << "[GLWidget] After stack->mouseReleaseEvent, event.isAccepted()="
@@ -90,10 +108,16 @@ void GLWidget::mouseReleaseEvent ( QMouseEvent * event ) {
 }
 
 void GLWidget::mouseMoveEvent ( QMouseEvent * event ) {
+  QPoint pos =
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    event->position().toPoint();
+#else
+    event->pos();
+#endif
   std::cout << "[GLWidget] mouseMoveEvent received, buttons=" << event->buttons()
-            << ", pos=(" << event->pos().x() << "," << event->pos().y() << ")" << std::endl;
+            << ", pos=(" << pos.x() << "," << pos.y() << ")" << std::endl;
   event->setAccepted ( false );
-  pixelloc loc=zoom.invZoom ( event->pos().x(),event->pos().y(),true );
+  pixelloc loc=zoom.invZoom ( pos.x(),pos.y(),true );
   if ( stack!=0 ) {
     stack->mouseMoveEvent ( event,loc );
     std::cout << "[GLWidget] After stack->mouseMoveEvent, event.isAccepted()="
@@ -245,6 +269,7 @@ void GLWidget::mainDraw() {
    painter.setRenderHint(QPainter::Antialiasing);
    painter.fillRect(rect(), QColor(64, 64, 128));
 
+   QTransform trans;
    const unsigned char *image_data = nullptr;
    int image_width = 0;
    int image_height = 0;
@@ -281,20 +306,18 @@ void GLWidget::mainDraw() {
      }
 
      if (image_data != nullptr && image_width > 1 && image_height > 1 && qfmt != QImage::Format_Invalid) {
+       zoom.setup(image_width, image_height, width(), height(), false);
+       trans = zoom.getQTransform(false);
        QImage qimg(image_data, image_width, image_height, image_stride, qfmt);
-       // Draw centered, keep aspect ratio, avoid relying on zoom/viewport state.
-       QSizeF targetSize = qimg.size();
-       targetSize.scale(QSizeF(width(), height()), Qt::KeepAspectRatio);
-       QRectF dst((width() - targetSize.width()) / 2.0, (height() - targetSize.height()) / 2.0,
-                  targetSize.width(), targetSize.height());
-       painter.drawImage(dst, qimg, QRectF(0, 0, qimg.width(), qimg.height()));
+       painter.setTransform(trans);
+       painter.drawImage(QPointF(0, 0), qimg);
+       painter.resetTransform();
      }
 
      if (locked) rb->unlockRead();
    }
 
    if (ALLOW_QPAINTER) {
-     QTransform trans;
      myQPainterOverlay(painter, trans);
    }
    c_draw.count();

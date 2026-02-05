@@ -28,6 +28,38 @@
 
 namespace {
 typedef CameraParameters::AdditionalCalibrationInformation AddnlCalibInfo;
+
+static bool ComputeCustomHomography(const CameraParameters& camera_parameters, cv::Mat& H) {
+  auto* aci = camera_parameters.additional_calibration_information;
+  if (aci == nullptr) return false;
+
+  std::vector<cv::Point2d> field_pts;
+  std::vector<cv::Point2d> image_pts;
+  field_pts.reserve(AddnlCalibInfo::kNumControlPoints);
+  image_pts.reserve(AddnlCalibInfo::kNumControlPoints);
+
+  for (int i = 0; i < AddnlCalibInfo::kNumControlPoints; ++i) {
+    const double fx = aci->control_point_field_xs[i]->getDouble();
+    const double fy = aci->control_point_field_ys[i]->getDouble();
+    const double ix = aci->control_point_image_xs[i]->getDouble();
+    const double iy = aci->control_point_image_ys[i]->getDouble();
+    if (!std::isfinite(fx) || !std::isfinite(fy) || !std::isfinite(ix) || !std::isfinite(iy)) return false;
+    field_pts.emplace_back(fx, fy);
+    image_pts.emplace_back(ix, iy);
+  }
+
+  H = cv::findHomography(field_pts, image_pts, 0);
+  return !H.empty();
+}
+
+static bool ApplyHomography(const cv::Mat& H, double x, double y, double& out_x, double& out_y) {
+  if (H.empty()) return false;
+  const double denom = H.at<double>(2, 0) * x + H.at<double>(2, 1) * y + H.at<double>(2, 2);
+  if (denom == 0.0) return false;
+  out_x = (H.at<double>(0, 0) * x + H.at<double>(0, 1) * y + H.at<double>(0, 2)) / denom;
+  out_y = (H.at<double>(1, 0) * x + H.at<double>(1, 1) * y + H.at<double>(1, 2)) / denom;
+  return std::isfinite(out_x) && std::isfinite(out_y);
+}
 }  // namespace
 
 PluginVisualize::PluginVisualize(
@@ -52,7 +84,6 @@ PluginVisualize::PluginVisualize(
   _v_chessboard = new VarBool("chessboard", false);
   _v_interactive_calibration = new VarBool("interactive calibration", true);
   _v_coordinate_graph = new VarBool("coordinate graph", false);
-  _v_custom_boundaries = new VarBool("custom boundaries", false);
 
   _v_mask_hull = new VarBool("image mask hull", true);
 
@@ -73,7 +104,6 @@ PluginVisualize::PluginVisualize(
   _settings->addChild(_v_chessboard);
   _settings->addChild(_v_interactive_calibration);
   _settings->addChild(_v_coordinate_graph);
-  _settings->addChild(_v_custom_boundaries);
   _threshold_lut=0;
   edge_image = 0;
   temp_grey_image = 0;
@@ -257,6 +287,78 @@ void PluginVisualize::DrawCameraCalibrationMarkers(
 void PluginVisualize::DrawCalibrationResult(
     FrameData* data, VisualizationFrame* vis_frame) {
   int steps_per_line(20);
+
+  // If the user set custom calibration corners, draw the field using a homography so
+  // the rectangle corners match the four clicked points exactly.
+  //
+  // This makes the UI behave as expected even when the full camera model (intrinsics/distortion)
+  // is not yet trustworthy.
+  if (calib_plugin != nullptr && calib_plugin->areAllBoundariesDefined()) {
+    cv::Mat H;
+    if (ComputeCustomHomography(camera_parameters, H)) {
+      auto drawLineH = [&](const GVector::vector3d<double>& start,
+                           const GVector::vector3d<double>& end,
+                           unsigned char r, unsigned char g, unsigned char b) {
+        const GVector::vector3d<double> delta =
+            (end - start) / static_cast<double>(steps_per_line);
+        GVector::vector3d<double> lastW(start);
+        double lastX = 0.0, lastY = 0.0;
+        if (!ApplyHomography(H, lastW.x, lastW.y, lastX, lastY)) return;
+        for (int i = 0; i < steps_per_line; ++i) {
+          const GVector::vector3d<double> nextW = lastW + delta;
+          double nextX = 0.0, nextY = 0.0;
+          if (!ApplyHomography(H, nextW.x, nextW.y, nextX, nextY)) break;
+          rgb draw_color;
+          draw_color.set(r, g, b);
+          vis_frame->data.drawFatLine(lastX, lastY, nextX, nextY, draw_color);
+          lastW = nextW;
+          lastX = nextX;
+          lastY = nextY;
+        }
+      };
+
+      auto drawArcH = [&](const GVector::vector3d<double>& center,
+                          double radius, double theta1, double theta2,
+                          unsigned char r, unsigned char g, unsigned char b) {
+        const double delta = (theta2 - theta1) / static_cast<double>(steps_per_line);
+        GVector::vector3d<double> lastW = center + radius * GVector::vector3d<double>(cos(theta1), sin(theta1), 0.0);
+        double lastX = 0.0, lastY = 0.0;
+        if (!ApplyHomography(H, lastW.x, lastW.y, lastX, lastY)) return;
+        for (int i = 1; i <= steps_per_line; ++i) {
+          const double theta = theta1 + static_cast<double>(i) * delta;
+          const GVector::vector3d<double> nextW =
+              center + radius * GVector::vector3d<double>(cos(theta), sin(theta), 0.0);
+          double nextX = 0.0, nextY = 0.0;
+          if (!ApplyHomography(H, nextW.x, nextW.y, nextX, nextY)) break;
+          rgb draw_color;
+          draw_color.set(r, g, b);
+          vis_frame->data.drawFatLine(lastX, lastY, nextX, nextY, draw_color);
+          lastW = nextW;
+          lastX = nextX;
+          lastY = nextY;
+        }
+      };
+
+      real_field.field_markings_mutex.lockForRead();
+      for (size_t i = 0; i < real_field.field_lines.size(); ++i) {
+        const FieldLine& line_segment = *(real_field.field_lines[i]);
+        const GVector::vector3d<double> p1(
+            line_segment.p1_x->getDouble(), line_segment.p1_y->getDouble(), 0.0);
+        const GVector::vector3d<double> p2(
+            line_segment.p2_x->getDouble(), line_segment.p2_y->getDouble(), 0.0);
+        drawLineH(p1, p2, 255, 100, 100);
+      }
+      for (size_t i = 0; i < real_field.field_arcs.size(); ++i) {
+        const FieldCircularArc& arc = *(real_field.field_arcs[i]);
+        const GVector::vector3d<double> center(
+            arc.center_x->getDouble(), arc.center_y->getDouble(), 0.0);
+        drawArcH(center, arc.radius->getDouble(), arc.a1->getDouble(), arc.a2->getDouble(), 255, 100, 100);
+      }
+      real_field.field_markings_mutex.unlock();
+      return;
+    }
+  }
+
   real_field.field_markings_mutex.lockForRead();
   for (size_t i = 0; i < real_field.field_lines.size(); ++i) {
     const FieldLine& line_segment =
@@ -477,7 +579,14 @@ ProcessResult PluginVisualize::process(
         data->map.insert("vis_frame",new VisualizationFrame()));
   }
 
-  if (_v_enabled->getBool()) {
+  // On Qt6/macOS we may render the raw camera image as a fallback when visualization is disabled.
+  // However, interactive/custom calibration relies on the visualization layer to show selection overlays.
+  // Force visualization rendering while calibration selections are active so the user can see feedback.
+  const bool force_for_calibration =
+      (calib_plugin != nullptr) &&
+      (calib_plugin->getIsSelectingFieldLine() || calib_plugin->getIsCustomCalibrationMode());
+
+  if (_v_enabled->getBool() || force_for_calibration) {
     //check video data...
     if (data->video.getWidth() == 0 || data->video.getHeight()==0) {
       //there is no valid video data
@@ -490,7 +599,7 @@ ProcessResult PluginVisualize::process(
     }
 
     // Draw camera image
-    if (_v_image->getBool()) {
+    if (_v_image->getBool() || force_for_calibration) {
       DrawCameraImage(data, vis_frame);
     } else {
       vis_frame->data.fillBlack();
@@ -522,11 +631,6 @@ ProcessResult PluginVisualize::process(
     }
 
     DrawCustomCalibrationSelection(data, vis_frame);
-
-    // Custom boundaries visualization
-    if (_v_custom_boundaries->getBool()) {
-      DrawCustomBoundaries(data, vis_frame);
-    }
 
     // Result of camera calibration, draws field to image
     if (_v_calibration_result->getBool()) {
@@ -870,70 +974,5 @@ void PluginVisualize::DrawCoordinateGraph(FrameData* data, VisualizationFrame* v
         vis_frame->data.drawString(img_label_pos.x - 40, img_label_pos.y - 10, label, label_color);
       }
     }
-  }
-}
-
-void PluginVisualize::DrawCustomBoundaries(FrameData* data, VisualizationFrame* vis_frame) {
-  if (calib_plugin == nullptr) {
-    return;
-  }
-
-  const PluginCameraCalibration::CustomBoundaryLine* boundaries = calib_plugin->getCustomBoundaries();
-  const int thickness = 3;
-  const int endpointRadius = 5;
-
-  struct BoundaryInfo {
-    rgb color;
-    const char* label;
-  };
-  
-  BoundaryInfo boundaryColors[4] = {
-    {rgb(255, 255, 0), "TOP"},        // Yellow
-    {rgb(0, 255, 255), "BOTTOM"},     // Cyan
-    {rgb(255, 0, 255), "LEFT"},       // Magenta
-    {rgb(0, 255, 0), "RIGHT"}         // Green
-  };
-
-  for (int i = 0; i < 4; ++i) {
-    if (!boundaries[i].defined) {
-      continue;
-    }
-
-    GVector::vector2d<double> startImage, endImage;
-    camera_parameters.field2image(boundaries[i].startField, startImage);
-    camera_parameters.field2image(boundaries[i].endField, endImage);
-
-    for (int t = -thickness; t <= thickness; t += 2) {
-      vis_frame->data.drawLine(
-        startImage.x + t,
-        startImage.y,
-        endImage.x + t,
-        endImage.y,
-        boundaryColors[i].color
-      );
-    }
-
-    vis_frame->data.drawFatBox(
-      startImage.x - endpointRadius,
-      startImage.y - endpointRadius,
-      endpointRadius * 2,
-      endpointRadius * 2,
-      boundaryColors[i].color
-    );
-    vis_frame->data.drawFatBox(
-      endImage.x - endpointRadius,
-      endImage.y - endpointRadius,
-      endpointRadius * 2,
-      endpointRadius * 2,
-      boundaryColors[i].color
-    );
-
-    GVector::vector2d<double> midPoint = (startImage + endImage) * 0.5;
-    vis_frame->data.drawString(
-      midPoint.x - 20,
-      midPoint.y - 15,
-      boundaryColors[i].label,
-      boundaryColors[i].color
-    );
   }
 }

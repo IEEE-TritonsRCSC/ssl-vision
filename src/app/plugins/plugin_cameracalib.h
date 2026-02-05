@@ -30,8 +30,6 @@
 #include "cameracalibwidget.h"
 #include <QPointF>
 
-class PluginVisualize;
-
 /**
 *	@author Tim Laue <Tim.Laue@dfki.de>
 */
@@ -91,7 +89,6 @@ protected:
   static const int kCustomCalibrationPointCount = 4;
   QPointF customClickPoints[kCustomCalibrationPointCount];
   int customClickCount;
-  bool useCustomCalibrationCameraModel;
 
   void sanitizeSobel(greyImage * img, GVector::vector2d<double> & val,int sobel_border=1);
 
@@ -136,8 +133,6 @@ public:
 
   // Custom calibration methods
   void setCustomCalibrationMode(bool enabled);
-  void setCustomCalibrationUseCameraModel(bool enabled);
-  bool getCustomCalibrationUseCameraModel() const { return useCustomCalibrationCameraModel; }
   void resetCustomCalibration();
   void resetCustomBoundaries();
   int getDefinedBoundaryCount() const;
@@ -151,8 +146,6 @@ public:
   
   // Accessor for custom boundaries (for visualization)
   const CustomBoundaryLine* getCustomBoundaries() const { return customBoundaries; }
-
-  void setVisualizePlugin(PluginVisualize* plugin);
 
 };
 

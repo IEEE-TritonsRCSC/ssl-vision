@@ -51,8 +51,7 @@ PluginCameraCalibration::PluginCameraCalibration(
     ccw(nullptr), grey_image(nullptr), rgb_image(nullptr), drag_x(nullptr),
     drag_y(nullptr), calib_drag_x(nullptr), calib_drag_y(nullptr),
     isSelectingFieldLine(false), currentLineType(LINE_NONE),
-    isCustomCalibrationMode(false), customClickCount(0),
-    useCustomCalibrationCameraModel(true) {
+    isCustomCalibrationMode(false), customClickCount(0) {
   video_width=video_height=0;
   settings=new VarList("Camera Calibrator");
   settings->addChild(camera_settings = new VarList("Camera Parameters"));
@@ -548,13 +547,6 @@ void PluginCameraCalibration::setCustomCalibrationMode(bool enabled) {
   }
 }
 
-void PluginCameraCalibration::setCustomCalibrationUseCameraModel(bool enabled) {
-  useCustomCalibrationCameraModel = enabled;
-  if (customClickCount == kCustomCalibrationPointCount) {
-    applyCustomCalibrationFromPoints();
-  }
-}
-
 void PluginCameraCalibration::addCustomCalibrationPoint(const QPointF& point) {
   if (customClickCount >= kCustomCalibrationPointCount) {
     return;
@@ -587,85 +579,55 @@ void PluginCameraCalibration::applyCustomCalibrationFromPoints() {
     points.push_back(info);
   }
 
-  if (useCustomCalibrationCameraModel) {
-    for (auto& point : points) {
-      GVector::vector2d<double> image_point(point.image.x(), point.image.y());
-      camera_parameters.image2field(point.field, image_point, 0.0);
-    }
-  }
-
-  if (useCustomCalibrationCameraModel) {
-    std::sort(points.begin(), points.end(),
-              [](const PointInfo& a, const PointInfo& b) {
-                return a.field.y > b.field.y;
-              });
-  } else {
-    std::sort(points.begin(), points.end(),
-              [](const PointInfo& a, const PointInfo& b) {
-                return a.image.y() < b.image.y();
-              });
-  }
+  // Sort the four clicked corners by image-space position. We then infer which
+  // edge corresponds to the long vs short side of the field based on the
+  // relative edge lengths in image space. This guarantees that the field
+  // rectangle corners match the 4 clicked points exactly.
+  std::sort(points.begin(), points.end(),
+            [](const PointInfo& a, const PointInfo& b) {
+              return a.image.y() < b.image.y();
+            });
 
   std::vector<PointInfo> top(points.begin(), points.begin() + 2);
   std::vector<PointInfo> bottom(points.begin() + 2, points.end());
 
-  if (useCustomCalibrationCameraModel) {
-    std::sort(top.begin(), top.end(),
-              [](const PointInfo& a, const PointInfo& b) {
-                return a.field.x < b.field.x;
-              });
-    std::sort(bottom.begin(), bottom.end(),
-              [](const PointInfo& a, const PointInfo& b) {
-                return a.field.x < b.field.x;
-              });
-  } else {
-    std::sort(top.begin(), top.end(),
-              [](const PointInfo& a, const PointInfo& b) {
-                return a.image.x() < b.image.x();
-              });
-    std::sort(bottom.begin(), bottom.end(),
-              [](const PointInfo& a, const PointInfo& b) {
-                return a.image.x() < b.image.x();
-              });
-  }
+  std::sort(top.begin(), top.end(),
+            [](const PointInfo& a, const PointInfo& b) {
+              return a.image.x() < b.image.x();
+            });
+  std::sort(bottom.begin(), bottom.end(),
+            [](const PointInfo& a, const PointInfo& b) {
+              return a.image.x() < b.image.x();
+            });
 
   PointInfo top_left = top[0];
   PointInfo top_right = top[1];
   PointInfo bottom_left = bottom[0];
   PointInfo bottom_right = bottom[1];
 
-  if (useCustomCalibrationCameraModel) {
-    GVector::vector3d<double> center =
-        (top_left.field + top_right.field + bottom_left.field + bottom_right.field) / 4.0;
-    top_left.field -= center;
-    top_right.field -= center;
-    bottom_left.field -= center;
-    bottom_right.field -= center;
+  const double field_length_config = field.field_length->getDouble();
+  const double field_width_config = field.field_width->getDouble();
+  const double long_side = std::max(field_length_config, field_width_config);
+  const double short_side = std::min(field_length_config, field_width_config);
+
+  const double top_edge_len = std::hypot(
+      top_right.image.x() - top_left.image.x(),
+      top_right.image.y() - top_left.image.y());
+  const double left_edge_len = std::hypot(
+      bottom_left.image.x() - top_left.image.x(),
+      bottom_left.image.y() - top_left.image.y());
+  const bool top_is_long = top_edge_len >= left_edge_len;
+
+  if (top_is_long) {
+    top_left.field = GVector::vector3d<double>(-long_side * 0.5, short_side * 0.5, 0.0);
+    top_right.field = GVector::vector3d<double>(long_side * 0.5, short_side * 0.5, 0.0);
+    bottom_left.field = GVector::vector3d<double>(-long_side * 0.5, -short_side * 0.5, 0.0);
+    bottom_right.field = GVector::vector3d<double>(long_side * 0.5, -short_side * 0.5, 0.0);
   } else {
-    const double field_length_config = field.field_length->getDouble();
-    const double field_width_config = field.field_width->getDouble();
-    const double long_side = std::max(field_length_config, field_width_config);
-    const double short_side = std::min(field_length_config, field_width_config);
-
-    const double top_edge_len = std::hypot(
-        top_right.image.x() - top_left.image.x(),
-        top_right.image.y() - top_left.image.y());
-    const double left_edge_len = std::hypot(
-        bottom_left.image.x() - top_left.image.x(),
-        bottom_left.image.y() - top_left.image.y());
-    const bool top_is_long = top_edge_len >= left_edge_len;
-
-    if (top_is_long) {
-      top_left.field = GVector::vector3d<double>(-long_side * 0.5, short_side * 0.5, 0.0);
-      top_right.field = GVector::vector3d<double>(long_side * 0.5, short_side * 0.5, 0.0);
-      bottom_left.field = GVector::vector3d<double>(-long_side * 0.5, -short_side * 0.5, 0.0);
-      bottom_right.field = GVector::vector3d<double>(long_side * 0.5, -short_side * 0.5, 0.0);
-    } else {
-      top_left.field = GVector::vector3d<double>(-short_side * 0.5, long_side * 0.5, 0.0);
-      top_right.field = GVector::vector3d<double>(short_side * 0.5, long_side * 0.5, 0.0);
-      bottom_left.field = GVector::vector3d<double>(-short_side * 0.5, -long_side * 0.5, 0.0);
-      bottom_right.field = GVector::vector3d<double>(short_side * 0.5, -long_side * 0.5, 0.0);
-    }
+    top_left.field = GVector::vector3d<double>(-short_side * 0.5, long_side * 0.5, 0.0);
+    top_right.field = GVector::vector3d<double>(short_side * 0.5, long_side * 0.5, 0.0);
+    bottom_left.field = GVector::vector3d<double>(-short_side * 0.5, -long_side * 0.5, 0.0);
+    bottom_right.field = GVector::vector3d<double>(short_side * 0.5, -long_side * 0.5, 0.0);
   }
 
   auto aci = camera_parameters.additional_calibration_information;
@@ -853,10 +815,4 @@ void PluginCameraCalibration::updateFieldConfiguration() {
   field.rebuildFieldLinesAndArcs();
 
   emit field.calibrationChanged();
-}
-
-void PluginCameraCalibration::setVisualizePlugin(PluginVisualize* plugin) {
-  if (ccw) {
-    ccw->setVisualizePlugin(plugin);
-  }
 }

@@ -73,7 +73,6 @@ protected:
   VarBool * _v_chessboard;
   VarBool * _v_interactive_calibration;
   VarBool * _v_coordinate_graph;
-  VarBool * _v_custom_boundaries;
 
   const CameraParameters& camera_parameters;
   const RoboCupField& real_field;
@@ -123,8 +122,6 @@ protected:
   void DrawInteractiveSelection(FrameData* data, VisualizationFrame* vis_frame);
   void DrawCustomCalibrationSelection(FrameData* data, VisualizationFrame* vis_frame);
 
-  void DrawCustomBoundaries(FrameData* data, VisualizationFrame* vis_frame);
-
   void DrawCoordinateGraph(FrameData* data, VisualizationFrame* vis_frame);
 
   static void DrawChessboard(FrameData *data, VisualizationFrame *vis_frame);
@@ -141,7 +138,6 @@ public:
    VarList * getSettings() override;
    string getName() override;
    VarTypes::VarBool * getCoordinateGraphVar() { return _v_coordinate_graph; }
-   VarTypes::VarBool * getCustomBoundariesVar() { return _v_custom_boundaries; }
 };
 
 #endif

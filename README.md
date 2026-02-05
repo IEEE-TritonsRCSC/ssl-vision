@@ -28,13 +28,15 @@ Following dependencies are required to build the software:
  * OpenCV >= 3
  * libdc1394 Version >= 2.0
  * video for linux 2 (v4l)
-* AVFoundation (macOS cameras via `-DUSE_AVFOUNDATION=true`)
+ * AVFoundation (macOS cameras via `-DUSE_AVFOUNDATION=true`)
 
 To get all of these packages in (k)ubuntu, run the `InstallPackagesUbuntu.sh` script.
 
 Or, in archlinux, run the `InstallPackagesArch.sh` script.
 
-On macOS 15+ (Apple Silicon) use `InstallPackagesMac.sh` to install the Homebrew-based dependency set (CMake, Eigen, Qt, OpenCV, libdc1394, etc.). The script warns that `qt@5` is scheduled for removal in May 2026; Qt 6 support can be enabled automatically by `cmake` when Qt 5 is unavailable.
+On macOS (Apple Silicon or Intel) use `InstallPackagesMac.sh` to install the Homebrew-based dependency set (CMake, Eigen,
+Qt 6, OpenCV, etc.). For capture on macOS you typically want `-DUSE_AVFOUNDATION=true` (webcams / UVC cameras exposed by
+the OS). Linux-only backends such as V4L2 and `libdc1394` do not apply on macOS.
 
 ### Configuring across multiple machines
 
@@ -47,7 +49,15 @@ CMake Error: The current CMakeCache.txt directory … is different than the dire
 Use `scripts/configure.sh` instead of invoking `cmake -B build` directly. The helper script checks the `CMAKE_HOME_DIRECTORY` stored in `build/CMakeCache.txt` and automatically wipes the build directory if it does not match the current checkout, ensuring cache consistency across machines:
 
 ```
-./scripts/configure.sh -DUSE_AVFOUNDATION=ON
+./scripts/configure.sh -DUSE_AVFOUNDATION=ON -DCMAKE_PREFIX_PATH=$(brew --prefix qt@6)
+cmake --build build
+```
+
+If you see linker warnings about mismatched macOS deployment targets (e.g. building for 13.0 but linking Homebrew dylibs
+built for a newer OS), set `CMAKE_OSX_DEPLOYMENT_TARGET` when configuring:
+
+```
+./scripts/configure.sh -DUSE_AVFOUNDATION=ON -DCMAKE_PREFIX_PATH=$(brew --prefix qt@6) -DCMAKE_OSX_DEPLOYMENT_TARGET=$(sw_vers -productVersion)
 cmake --build build
 ```
 

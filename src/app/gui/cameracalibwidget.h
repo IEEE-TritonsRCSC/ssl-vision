@@ -32,7 +32,6 @@
 #include <camera_calibration.h>
 
 class PluginCameraCalibration;
-class PluginVisualize;
 
 /*!
   \file    cameracalibwidget.h
@@ -61,7 +60,6 @@ public:
     void set_slider_from_vars();
 
     void setPlugin(PluginCameraCalibration* plugin) { calibrationPlugin = plugin; }
-    void setVisualizePlugin(PluginVisualize* plugin);
 
     void updateCustomCalibStatus();
 
@@ -82,14 +80,11 @@ public:
     QCheckBox* interactiveCalibrationCheckBox;
     QComboBox* lineTypeComboBox;
     PluginCameraCalibration* calibrationPlugin;
-    PluginVisualize* visualizePlugin;
 
     // Custom calibration tab UI elements
     QLabel* customCalibStatus;
     QPushButton* customCalibResetButton;
     QCheckBox* customCalibrationModeCheckBox;
-    QCheckBox* customCalibrationUseCameraModelCheckBox;
-    QCheckBox* customBoundariesCheckBox;
 
     public slots:
     void is_clicked_update_control_points();
@@ -107,9 +102,7 @@ public:
     void interactiveCalibrationToggled(int state);
     void lineTypeChanged(int index);
     void customCalibrationModeToggled(int state);
-    void customCalibrationUseCameraModelToggled(int state);
     void customCalibResetClicked();
-    void customBoundariesToggled(int state);
 
 private:
   void setEnabledBasedOnModel();
