@@ -64,6 +64,8 @@ EOF
   if [ -d "${QT6_PATH}" ]; then
     echo "[info] Qt 6 installed at: ${QT6_PATH}"
     echo "[info] Qt 6 tools: ${QT6_PATH}/bin"
+    echo "[info] If CMake fails to find Qt6, configure with:"
+    echo "       -DCMAKE_PREFIX_PATH=${QT6_PATH}"
   fi
 fi
 
@@ -73,5 +75,5 @@ echo ""
 echo "Optional SDKs (Spinnaker, Pylon, mvIMPACT) must be installed manually following vendor instructions."
 echo ""
 echo "To build ssl-vision on macOS, run:"
-echo "  cmake -B build -DUSE_AVFOUNDATION=ON"
+echo "  cmake -B build -DUSE_AVFOUNDATION=ON -DCMAKE_PREFIX_PATH=$(brew --prefix qt@6) -DCMAKE_OSX_DEPLOYMENT_TARGET=$(sw_vers -productVersion)"
 echo "  cmake --build build"

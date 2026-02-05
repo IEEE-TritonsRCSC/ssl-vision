@@ -22,7 +22,7 @@ namespace VarTypes {
   VarTreeView::VarTreeView(VarTreeModel * tmodel) {
     model=tmodel;
     tw=new QTreeView();
-    delegate = new VarItemDelegate();
+    delegate = new VarItemDelegate(tw);
     tw->setItemDelegate(delegate);
     tw->setAlternatingRowColors(true);
     tw->setUniformRowHeights ( false );

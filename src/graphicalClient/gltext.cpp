@@ -21,6 +21,9 @@
 
 #include "gltext.h"
 
+#include <array>
+#include <vector>
+
 const bool GLText::debugTesselation = false;
 const double GLText::FontRenderSize = 1000.0;
 
@@ -194,8 +197,8 @@ void GLText::initializeGlyph(char ch)
   path.addText(0,0,font,QString((QChar)ch));
   QList<QPolygonF> polygons = path.toSubpathPolygons();
   if(debugTesselation){
-    printf("%d Sub-Polygons\n",polygons.size());
-  printf("Poly has %d vertices:\n",polygons.size());
+    printf("%lld Sub-Polygons\n",static_cast<long long>(polygons.size()));
+    printf("Poly has %lld vertices:\n",static_cast<long long>(polygons.size()));
   }
   int numVertices = 0;
   double minX=DBL_MAX, minY=DBL_MAX, maxX=-DBL_MAX, maxY=-DBL_MAX;
@@ -218,22 +221,27 @@ void GLText::initializeGlyph(char ch)
   glyph.width = (maxX - minX)/FontRenderSize;
   
   if(debugTesselation) printf("numVertices: %d\n",numVertices);
-  GLdouble vertices[numVertices][3];
+  std::vector<std::array<GLdouble, 3>> vertices(static_cast<size_t>(numVertices));
   int j=0;
   for(int i=0; i<polygons.size(); i++){
     for(int k=0; k<polygons[i].size(); k++){
-      vertices[j][0] = polygons[i][k].x()/FontRenderSize;
-      vertices[j][1] = -polygons[i][k].y()/FontRenderSize;
-      vertices[j][2] = 9;
+      vertices[static_cast<size_t>(j)][0] = polygons[i][k].x()/FontRenderSize;
+      vertices[static_cast<size_t>(j)][1] = -polygons[i][k].y()/FontRenderSize;
+      vertices[static_cast<size_t>(j)][2] = 9;
       j++;
     }
   }
   
   GLUtesselator* tess = gluNewTess();
-  gluTessCallback(tess, GLU_TESS_BEGIN, (GLvoid (__stdcall *)()) tessBeginCB);
-  gluTessCallback(tess, GLU_TESS_END, (GLvoid (__stdcall *)()) tessEndCB);
-  gluTessCallback(tess, GLU_TESS_ERROR, (GLvoid (__stdcall *)()) tessErrorCB);
-  gluTessCallback(tess, GLU_TESS_VERTEX, (GLvoid (__stdcall *)()) tessVertexCB);
+#ifdef _WIN32
+  using TessCallback = GLvoid (__stdcall *)();
+#else
+  using TessCallback = GLvoid (*)();
+#endif
+  gluTessCallback(tess, GLU_TESS_BEGIN, (TessCallback) tessBeginCB);
+  gluTessCallback(tess, GLU_TESS_END, (TessCallback) tessEndCB);
+  gluTessCallback(tess, GLU_TESS_ERROR, (TessCallback) tessErrorCB);
+  gluTessCallback(tess, GLU_TESS_VERTEX, (TessCallback) tessVertexCB);
   
   glMatrixMode(GL_MODELVIEW);
   glPushMatrix();
@@ -250,7 +258,8 @@ void GLText::initializeGlyph(char ch)
   for(int i=0; i<polygons.size(); i++){
     gluTessBeginContour(tess);
     for(int k=0; k<polygons[i].size(); k++){
-      gluTessVertex(tess, vertices[j], vertices[j]);
+      GLdouble *vertex = vertices[static_cast<size_t>(j)].data();
+      gluTessVertex(tess, vertex, vertex);
       j++;
     }
     gluTessEndContour(tess);

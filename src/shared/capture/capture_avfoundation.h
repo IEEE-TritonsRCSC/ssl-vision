@@ -114,6 +114,7 @@ private:
   bool configureSession();
   void teardownSession();
   bool ensureDeviceSelection();
+  bool ensureAuthorization();
 
   bool is_capturing = false;
 

@@ -219,15 +219,26 @@ namespace VarTypes {
       (void)delegate;
       QComboBox * combo =(QComboBox *)editor;
       int n = getCount();
-      QString tmp;
       combo->blockSignals(true);
-      combo->clear();
-      for (int i=0;i<n;i++) {
-        tmp=QString::fromStdString(getLabel(i));
-        combo->insertItem(combo->count(), tmp);
-        if (tmp==QString::fromStdString(getString())) {
-          combo->setCurrentIndex(i);
+      bool contents_match = (combo->count() == n);
+      if (contents_match) {
+        for (int i=0;i<n;i++) {
+          if (combo->itemText(i) != QString::fromStdString(getLabel(i))) {
+            contents_match = false;
+            break;
+          }
         }
+      }
+      if (!contents_match) {
+        combo->clear();
+        for (int i=0;i<n;i++) {
+          combo->insertItem(combo->count(), QString::fromStdString(getLabel(i)));
+        }
+      }
+      QString current = QString::fromStdString(getString());
+      int idx = combo->findText(current);
+      if (idx >= 0 && combo->currentIndex() != idx) {
+        combo->setCurrentIndex(idx);
       }
       combo->blockSignals(false);
     }

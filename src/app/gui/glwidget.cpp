@@ -22,6 +22,10 @@
 #include "glwidget.h"
 #include <iostream>
 
+#include <QColor>
+#include <QImage>
+#include <QPainter>
+
 void GLWidget::mouseAction ( QMouseEvent * event, pixelloc loc ) {
   (void)loc;
   if ( ( event->buttons() & Qt::RightButton ) !=0 ) {
@@ -219,8 +223,7 @@ void GLWidget::myGLinit() {
 
 void GLWidget::paintEvent ( QPaintEvent * e ) {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-  (void)e;
-  mainDraw();
+  GL_WIDGET_BASE::paintEvent(e);
 #else
   //QGLWidget::paintEvent(e);
   if (ALLOW_QPAINTER) {
@@ -235,6 +238,68 @@ void GLWidget::paintEvent ( QPaintEvent * e ) {
 
 void GLWidget::mainDraw() {
    if ( actionOn->isChecked() ==false ) return;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+   // Qt6 on macOS uses a core profile OpenGL context where glDrawPixels() is not available.
+   // Render frames with QPainter regardless of ALLOW_QPAINTER to ensure the video is visible.
+   QPainter painter(this);
+   painter.setRenderHint(QPainter::Antialiasing);
+   painter.fillRect(rect(), QColor(64, 64, 128));
+
+   const unsigned char *image_data = nullptr;
+   int image_width = 0;
+   int image_height = 0;
+   int image_stride = 0;
+   QImage::Format qfmt = QImage::Format_Invalid;
+
+   bool locked = false;
+   if (rb != 0) {
+     rb->lockRead();
+     locked = true;
+     int idx = rb->curRead();
+     FrameData *frame = rb->getPointer(idx);
+
+     VisualizationFrame *vis_frame = (VisualizationFrame *)(frame->map.get("vis_frame"));
+     if (vis_frame != 0 && vis_frame->valid == true && vis_frame->data.getData() != 0 &&
+         vis_frame->data.getWidth() > 1 && vis_frame->data.getHeight() > 1) {
+       rgbImage &img = vis_frame->data;
+       image_data = img.getData();
+       image_width = img.getWidth();
+       image_height = img.getHeight();
+       image_stride = img.getWidth() * 3;
+       qfmt = QImage::Format_RGB888;
+     } else if (frame->video.getData() != nullptr && frame->video.getWidth() > 1 && frame->video.getHeight() > 1) {
+       image_data = frame->video.getData();
+       image_width = frame->video.getWidth();
+       image_height = frame->video.getHeight();
+       if (frame->video.getColorFormat() == COLOR_RGB8) {
+         image_stride = frame->video.getWidth() * 3;
+         qfmt = QImage::Format_RGB888;
+       } else if (frame->video.getColorFormat() == COLOR_RGBA8) {
+         image_stride = frame->video.getWidth() * 4;
+         qfmt = QImage::Format_RGBA8888;
+       }
+     }
+
+     if (image_data != nullptr && image_width > 1 && image_height > 1 && qfmt != QImage::Format_Invalid) {
+       QImage qimg(image_data, image_width, image_height, image_stride, qfmt);
+       // Draw centered, keep aspect ratio, avoid relying on zoom/viewport state.
+       QSizeF targetSize = qimg.size();
+       targetSize.scale(QSizeF(width(), height()), Qt::KeepAspectRatio);
+       QRectF dst((width() - targetSize.width()) / 2.0, (height() - targetSize.height()) / 2.0,
+                  targetSize.width(), targetSize.height());
+       painter.drawImage(dst, qimg, QRectF(0, 0, qimg.width(), qimg.height()));
+     }
+
+     if (locked) rb->unlockRead();
+   }
+
+   if (ALLOW_QPAINTER) {
+     QTransform trans;
+     myQPainterOverlay(painter, trans);
+   }
+   c_draw.count();
+   return;
+#endif
    if (ALLOW_QPAINTER) {
     makeCurrent();
     glMatrixMode(GL_MODELVIEW);
@@ -247,10 +312,11 @@ void GLWidget::mainDraw() {
 
    if (ALLOW_QPAINTER) {
     /// new qpainter overlay stuff
-    QTransform trans=zoom.getQTransform(false);
     QPainter painter;
     painter.begin(this);
     painter.setRenderHint(QPainter::Antialiasing);
+
+    QTransform trans = zoom.getQTransform(false);
     myQPainterOverlay(painter,trans);
 
     painter.end();
@@ -273,6 +339,10 @@ void GLWidget::myGLdraw() {
     glPushMatrix();
 
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+      // Frame rendering is handled via QPainter in mainDraw() for Qt6.
+      (void)rb;
+#else
       if ( rb!=0 ) {
         rb->lockRead();
         int idx=rb->curRead();
@@ -298,6 +368,7 @@ void GLWidget::myGLdraw() {
         }
         rb->unlockRead();
       }
+#endif
 
       glMatrixMode ( GL_MODELVIEW );
     glPopMatrix();

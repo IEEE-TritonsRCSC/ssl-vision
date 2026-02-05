@@ -32,12 +32,21 @@ namespace VarTypes {
   
   void VarItemDelegate::editorChangeEvent() {
     auto *editor = qobject_cast<QWidget *>(sender());
-    auto *view = qobject_cast<QAbstractItemView *>(parent());
-    if (!editor || !view) {
+    if (!editor) {
       return;
     }
-    if (!view->isAncestorOf(editor) && view != editor) {
-      return;
+
+    // Try to locate the owning view by walking up the parent chain from the editor.
+    // This is robust even when the delegate isn't parented to the view.
+    QAbstractItemView *view = nullptr;
+    for (QWidget *w = editor; w != nullptr; w = w->parentWidget()) {
+      view = qobject_cast<QAbstractItemView *>(w);
+      if (view) break;
+    }
+    if (view) {
+      if (!view->isAncestorOf(editor) && view != editor) {
+        return;
+      }
     }
     emit commitData(editor);
   }

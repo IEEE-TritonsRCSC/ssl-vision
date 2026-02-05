@@ -279,6 +279,8 @@ void CaptureThread::kill() {
 }
 
 bool CaptureThread::init() {
+  // Ensure the currently selected capture module is active before starting.
+  selectCaptureMethod();
   capture_mutex.lock();
   bool res = (capture != nullptr) && capture->startCapture();
   if (res==true) {

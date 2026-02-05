@@ -208,6 +208,10 @@ bool CaptureAVFoundation::applyFormatPreferences(AVCaptureDevice *device) {
 }
 
 bool CaptureAVFoundation::configureSession() {
+  if (!ensureAuthorization()) {
+    return false;
+  }
+
   session = [[AVCaptureSession alloc] init];
   if (!session) {
     fprintf(stderr, "[AVFoundation] Failed to create session\n");
@@ -322,6 +326,20 @@ bool CaptureAVFoundation::startCapture() {
 
   [session startRunning];
   is_capturing = true;
+  frame_queue.clear();
+
+  // Wait briefly for the first frame to arrive so we can fail fast
+  // when capture permissions or device selection are not working.
+  for (int i = 0; i < 10 && frame_queue.empty(); ++i) {
+    frame_available.wait(&frame_mutex, 200);
+  }
+  if (frame_queue.empty()) {
+    fprintf(stderr, "[AVFoundation] No frames received after start; stopping capture\n");
+    is_capturing = false;
+    locker.unlock();
+    teardownSession();
+    return false;
+  }
   return true;
 }
 
@@ -338,13 +356,55 @@ bool CaptureAVFoundation::stopCapture() {
   return true;
 }
 
+bool CaptureAVFoundation::ensureAuthorization() {
+  AVAuthorizationStatus status =
+      [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo];
+  if (status == AVAuthorizationStatusAuthorized) {
+    return true;
+  }
+  if (status == AVAuthorizationStatusDenied || status == AVAuthorizationStatusRestricted) {
+    fprintf(stderr,
+            "[AVFoundation] Camera access denied or restricted. Enable camera access for ssl-vision in System Settings.\n");
+    return false;
+  }
+  if (status == AVAuthorizationStatusNotDetermined) {
+    __block bool granted = false;
+    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo
+                               completionHandler:^(BOOL didGrant) {
+                                 granted = didGrant;
+                                 dispatch_semaphore_signal(sema);
+                               }];
+    });
+    dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5 * NSEC_PER_SEC));
+    dispatch_semaphore_wait(sema, timeout);
+    if (!granted) {
+      fprintf(stderr,
+              "[AVFoundation] Camera access not granted. Enable camera access for ssl-vision in System Settings.\n");
+      return false;
+    }
+    return true;
+  }
+
+  fprintf(stderr, "[AVFoundation] Unable to determine camera authorization status.\n");
+  return false;
+}
+
 RawImage CaptureAVFoundation::getFrame() {
   QMutexLocker locker(&frame_mutex);
-  if (frame_queue.empty()) {
+  for (int i = 0; i < 3 && frame_queue.empty(); ++i) {
     frame_available.wait(&frame_mutex, kFrameWaitTimeoutMs);
   }
 
   if (frame_queue.empty()) {
+    if (frame_buffer.getWidth() > 0 && frame_buffer.getHeight() > 0 && frame_buffer.getData() != nullptr) {
+      if (diagnosticsEnabled()) {
+        logDiagnostic("frame_queue empty after wait; reusing last frame");
+      }
+      frame_buffer.setTime(GetTimeSec());
+      return frame_buffer;
+    }
     if (diagnosticsEnabled()) {
       logDiagnostic("frame_queue empty after wait; returning zero-sized frame");
     }

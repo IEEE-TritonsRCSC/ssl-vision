@@ -78,18 +78,20 @@ namespace VarTypes {
     virtual void setEditorData(const VarItemDelegate * delegate, QWidget *editor) const {
       (void)delegate;
       QCheckBox * checker=(QCheckBox *) editor;
+      checker->blockSignals(true);
       checker->setChecked(getBool());
+      checker->setText(getBool() ? "True" : "False");
+      checker->blockSignals(false);
   
     }
     virtual void setModelData(const VarItemDelegate * delegate, QWidget *editor) {
       (void)delegate;
       QCheckBox * checker=(QCheckBox *) editor;
-      if (checker->isChecked()) {
-        checker->setText("True"); 
-      } else {
-        checker->setText("False");
-      }
-      if (setBool(checker->isChecked())) mvcEditCompleted();
+      bool newVal = checker->isChecked();
+      checker->blockSignals(true);
+      checker->setText(newVal ? "True" : "False");
+      checker->blockSignals(false);
+      if (setBool(newVal)) mvcEditCompleted();
   
     }
   
