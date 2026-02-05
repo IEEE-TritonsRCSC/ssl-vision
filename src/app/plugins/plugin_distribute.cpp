@@ -37,6 +37,15 @@ string PluginDistribute::getName() { return "Distribute"; }
 
 void PluginDistribute::drawCameraImage(FrameData *data, VisualizationFrame *vis_frame) {
   const ColorFormat source_format = data->video.getColorFormat();
+  
+  // Check for invalid frame dimensions (width or height is 0)
+  if (data->video.getWidth() <= 0 || data->video.getHeight() <= 0 ||
+      vis_frame->data.getWidth() <= 0 || vis_frame->data.getHeight() <= 0) {
+    // Frame is invalid - blank the visualization
+    vis_frame->data.fillBlack();
+    return;
+  }
+  
   if (source_format == COLOR_RGB8) {
     // plain copy of data
     memcpy(vis_frame->data.getData(), data->video.getData(),

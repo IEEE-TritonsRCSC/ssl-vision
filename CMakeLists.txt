@@ -40,6 +40,13 @@ if(APPLE)
   set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "Minimum macOS version" FORCE)
   set(CMAKE_MACOSX_RPATH ON)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-deprecated-declarations")
+
+  # Qt6-specific macOS fixes for better UI performance
+  if(_qt_version EQUAL 6)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DQT_NO_DEBUG_OUTPUT")
+    # Disable high DPI scaling as it causes issues with LUT widget
+    add_definitions(-DQT_DISABLE_DEPRECATED_BEFORE=0x050f00)
+  endif()
 endif()
 
 # Find third-party libraries
@@ -190,12 +197,14 @@ if(APPLE AND USE_AVFOUNDATION)
   find_library(COREVIDEO_FRAMEWORK CoreVideo REQUIRED)
   find_library(QUARTZCORE_FRAMEWORK QuartzCore REQUIRED)
   find_library(APPSERVICES_FRAMEWORK ApplicationServices REQUIRED)
+  find_library(ACCELERATE_FRAMEWORK Accelerate REQUIRED)
   set(AVFOUNDATION_LIBS
       ${AVFOUNDATION_FRAMEWORK}
       ${COREMEDIA_FRAMEWORK}
       ${COREVIDEO_FRAMEWORK}
       ${QUARTZCORE_FRAMEWORK}
-      ${APPSERVICES_FRAMEWORK})
+      ${APPSERVICES_FRAMEWORK}
+      ${ACCELERATE_FRAMEWORK})
   set(SHARED_SRCS ${SHARED_SRCS}
       ${shared_dir}/capture/capture_avfoundation.mm)
   set(SHARED_HEADERS ${SHARED_HEADERS}

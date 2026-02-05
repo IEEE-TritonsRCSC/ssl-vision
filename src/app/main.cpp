@@ -86,6 +86,10 @@ int main(int argc, char *argv[])
   QApplication::setAttribute( Qt::AA_DisableHighDpiScaling );
   QApplication app(argc, argv);
 
+  // Set application and organization name for proper QSettings persistence on macOS
+  QApplication::setOrganizationName("RoboCup");
+  QApplication::setApplicationName("ssl-vision");
+
   GetOpt opts(argc, argv);
   bool help=false;
   bool start=false;

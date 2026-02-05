@@ -104,7 +104,9 @@ namespace VarTypes {
             VarType * dt=item->getVarType();
             if (dt!=0) {
               if ((dt->getFlags() & VARTYPE_FLAG_PERSISTENT) != 0x00) {
-                tw->openPersistentEditor(index);
+                if (!tw->isPersistentEditorOpen(index)) {
+                  tw->openPersistentEditor(index);
+                }
               } /*else {
                 tw->closePersistentEditor(index);
               }*/
@@ -113,7 +115,7 @@ namespace VarTypes {
         }
       }
     }
-  
+
   }
   void VarTreeView::newItemChecksRows(const QModelIndex & parent, int start, int end) {
     (void)parent;

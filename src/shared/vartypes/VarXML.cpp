@@ -21,6 +21,11 @@
 
 #include "VarXML.h"
 
+#ifdef __APPLE__
+#include <unistd.h>
+#include <fcntl.h>
+#endif
+
 namespace VarTypes {
   VarXML::VarXML() {};
   VarXML::~VarXML() {};
@@ -42,6 +47,15 @@ namespace VarTypes {
     const VarTypes::XMLError error = root.writeToFile(filename.c_str());
     if (error != VarTypes::eXMLErrorNone) {
       fprintf(stderr, "Error saving XML: %d\n", error);
+    } else {
+      // Force file system flush to ensure data is written to disk on macOS
+      // This is especially important for macOS which may delay writes
+      FILE* f = fopen(filename.c_str(), "r");
+      if (f) {
+        fflush(f);
+        fsync(fileno(f));
+        fclose(f);
+      }
     }
   }
 

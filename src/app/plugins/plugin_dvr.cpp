@@ -768,7 +768,12 @@ void DVRUtils::saveFrame(const DVRFrame& frame, const QString& dir, int index){
 
 void DVRUtils::saveDetectionFrame(const SSL_DetectionFrame& detection_frame, const QString& dir, int index){
   std::string json_string;
-  google::protobuf::util::MessageToJsonString(detection_frame, &json_string);
+  auto status = google::protobuf::util::MessageToJsonString(detection_frame, &json_string);
+
+  if (!status.ok()) {
+    fprintf(stderr, "Failed to convert detection frame to JSON: %s\n", status.ToString().c_str());
+    return;
+  }
 
   QString num = QString::number(index);
   num = "00000" + num;

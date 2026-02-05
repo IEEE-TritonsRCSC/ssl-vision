@@ -41,7 +41,6 @@ PluginCameraIntrinsicCalibration::PluginCameraIntrinsicCalibration(FrameBuffer *
 }
 
 PluginCameraIntrinsicCalibration::~PluginCameraIntrinsicCalibration() {
-  worker->deleteLater();
   delete widget;
   delete worker;
   delete chessboard_capture_dt;
@@ -55,6 +54,11 @@ QWidget *PluginCameraIntrinsicCalibration::getControlWidget() { return static_ca
 
 ProcessResult PluginCameraIntrinsicCalibration::process(FrameData *data, RenderOptions *options) {
   (void)options;
+
+  // Check for invalid frame dimensions (width or height is 0)
+  if (data->video.getWidth() <= 0 || data->video.getHeight() <= 0) {
+    return ProcessingOk;
+  }
 
   Image<raw8> *img_calibration;
   if ((img_calibration = reinterpret_cast<Image<raw8> *>(data->map.get("img_calibration"))) == nullptr) {
@@ -141,8 +145,15 @@ PluginCameraIntrinsicCalibrationWorker::PluginCameraIntrinsicCalibrationWorker(C
 }
 
 PluginCameraIntrinsicCalibrationWorker::~PluginCameraIntrinsicCalibrationWorker() {
-  thread->quit();
-  thread->deleteLater();
+  if (thread) {
+    thread->quit();
+    if (!thread->wait(2000)) {
+      thread->requestInterruption();
+      thread->wait();
+    }
+    delete thread;
+    thread = nullptr;
+  }
 
   delete image_storage;
   delete corner_sub_pixel_windows_size;
@@ -337,8 +348,15 @@ ImageStorage::ImageStorage(CameraIntrinsicCalibrationWidget *widget) : widget(wi
 }
 
 ImageStorage::~ImageStorage() {
-  thread->quit();
-  thread->deleteLater();
+  if (thread) {
+    thread->quit();
+    if (!thread->wait(2000)) {
+      thread->requestInterruption();
+      thread->wait();
+    }
+    delete thread;
+    thread = nullptr;
+  }
   delete image_dir;
 }
 

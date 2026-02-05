@@ -206,12 +206,12 @@ namespace VarTypes {
   //Qt model/view gui stuff:
   public:
     virtual QWidget * createEditor(const VarItemDelegate * delegate, QWidget *parent, const QStyleOptionViewItem &option) {
-      //TODO add connect...
       (void)delegate;
       (void)parent;
       (void)option;
       QComboBox * w = new QComboBox(parent);
-      connect((const QObject *)w,SIGNAL(currentIndexChanged( int )),(const QObject *)delegate,SLOT(editorChangeEvent()));
+      w->setEditable(false);
+      connect(w,SIGNAL(currentTextChanged(const QString &)),(const QObject *)delegate,SLOT(editorChangeEvent()));
       return w;
     }
     
@@ -220,6 +220,7 @@ namespace VarTypes {
       QComboBox * combo =(QComboBox *)editor;
       int n = getCount();
       QString tmp;
+      combo->blockSignals(true);
       combo->clear();
       for (int i=0;i<n;i++) {
         tmp=QString::fromStdString(getLabel(i));
@@ -228,12 +229,16 @@ namespace VarTypes {
           combo->setCurrentIndex(i);
         }
       }
+      combo->blockSignals(false);
     }
   
     virtual void setModelData(const VarItemDelegate * delegate, QWidget *editor) {
       (void)delegate;
       QComboBox * combo=(QComboBox *) editor;
-      if (select(combo->currentText().toStdString())) mvcEditCompleted();
+      QString currentText = combo->currentText();
+      if (!currentText.isEmpty() && select(currentText.toStdString())) {
+        mvcEditCompleted();
+      }
     };
   
   };

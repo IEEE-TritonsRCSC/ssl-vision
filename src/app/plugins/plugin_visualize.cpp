@@ -97,6 +97,15 @@ void PluginVisualize::DrawCameraImage(
     FrameData* data, VisualizationFrame* vis_frame) {
   //if converting entire image then blanking is not needed
   const ColorFormat source_format = data->video.getColorFormat();
+  
+  // Check for invalid frame dimensions (width or height is 0)
+  if (data->video.getWidth() <= 0 || data->video.getHeight() <= 0 ||
+      vis_frame->data.getWidth() <= 0 || vis_frame->data.getHeight() <= 0) {
+    // Frame is invalid - blank the visualization
+    vis_frame->data.fillBlack();
+    return;
+  }
+  
   if (source_format == COLOR_RGB8) {
     //plain copy of data
     memcpy(vis_frame->data.getData(), data->video.getData(),
@@ -604,10 +613,15 @@ void PluginVisualize::drawFieldLine(
 }
 
 void PluginVisualize::DrawChessboard(FrameData *data,
-                                     VisualizationFrame *vis_frame) {
+                                      VisualizationFrame *vis_frame) {
   Chessboard *chessboard;
   if ((chessboard = reinterpret_cast<Chessboard*>(data->map.get("chessboard"))) == nullptr) {
     std::cerr << "chessboard_found key missing from data map.\n";
+    return;
+  }
+
+  // Check for invalid frame dimensions
+  if (vis_frame->data.getWidth() <= 0 || vis_frame->data.getHeight() <= 0) {
     return;
   }
 
@@ -616,7 +630,7 @@ void PluginVisualize::DrawChessboard(FrameData *data,
                          vis_frame->data.getData());
 
   cv::drawChessboardCorners(chessboard_img, chessboard->pattern_size, chessboard->corners,
-                            chessboard->pattern_was_found);
+                             chessboard->pattern_was_found);
 }
 
 void PluginVisualize::DrawChessboardCalibrationPoints(FrameData *data, VisualizationFrame *vis_frame) {

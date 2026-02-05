@@ -123,6 +123,7 @@ private:
   VarInt *v_height = nullptr;
   VarInt *v_fps = nullptr;
   VarBool *v_mirror = nullptr;
+  VarBool *v_diagnostics = nullptr;
 
   QMutex frame_mutex;
   QWaitCondition frame_available;
@@ -136,6 +137,8 @@ private:
   dispatch_queue_t capture_queue = nullptr;
 
   bool applyFormatPreferences(AVCaptureDevice *device);
+  bool diagnosticsEnabled() const;
+  void logDiagnostic(const std::string &message) const;
 };
 
 #endif // defined(__APPLE__) || defined(Q_MOC_RUN)

@@ -23,8 +23,10 @@
 #include <capture_splitter.h>
 #include <iostream>
 #include <iomanip>
+#include <sstream>
 
 #include "capture_video.h"
+#include "colors.h"
 
 CaptureThread::CaptureThread(int cam_id)
 {
@@ -39,6 +41,7 @@ CaptureThread::CaptureThread(int cam_id)
   control->addChild( (VarType*) (c_auto_refresh= new VarBool("auto refresh params",true)));
   // timings should only be printed on demand for a short period of time by temporally activating this flag
   control->addChild( (VarType*) (c_print_timings = new VarBool("print timings",false)));
+  control->addChild( (VarType*) (c_capture_diagnostics = new VarBool("capture diagnostics", false)));
   control->addChild( (VarType*) (c_refresh= new VarTrigger("re-read params","Refresh")));
   control->addChild( (VarType*) (captureModule= new VarStringEnum("Capture Module",camId < 1 ? "Read from files" : "None")));
   captureModule->addFlags(VARTYPE_FLAG_NOLOAD_ENUM_CHILDREN);
@@ -317,6 +320,16 @@ void CaptureThread::refresh() {
 }
 
 
+bool CaptureThread::captureDiagnosticsEnabled() const {
+  return c_capture_diagnostics && c_capture_diagnostics->getBool();
+}
+
+void CaptureThread::logCaptureDiagnostic(const std::string &message) const {
+  if (captureDiagnosticsEnabled()) {
+    std::cout << "[CaptureThread][Diag] " << message << std::endl;
+  }
+}
+
 void CaptureThread::run() {
     CaptureStats * stats;
     bool changed;
@@ -336,11 +349,28 @@ void CaptureThread::run() {
         if ((capture != nullptr) && (capture->isCapturing())) {
           auto t_start = std::chrono::steady_clock::now();
           RawImage pic_raw=capture->getFrame();
+          if (captureDiagnosticsEnabled()) {
+            std::ostringstream oss;
+            oss << "getFrame returned width=" << pic_raw.getWidth()
+                << " height=" << pic_raw.getHeight()
+                << " format=" << Colors::colorFormatToString(pic_raw.getColorFormat())
+                << " data=" << (void*)pic_raw.getData();
+            logCaptureDiagnostic(oss.str());
+          }
           auto t_getFrame = std::chrono::steady_clock::now();
           pic_raw.setTime(GetTimeSec());
           d->time = pic_raw.getTime();
           d->time_cam=pic_raw.getTimeCam();
           bool bSuccess = capture->copyAndConvertFrame( pic_raw,d->video);
+          if (captureDiagnosticsEnabled()) {
+            std::ostringstream oss;
+            oss << "copyAndConvertFrame result=" << (bSuccess ? "success" : "failure")
+                << " | d->video width=" << d->video.getWidth()
+                << " height=" << d->video.getHeight()
+                << " format=" << Colors::colorFormatToString(d->video.getColorFormat())
+                << " data=" << (void*)d->video.getData();
+            logCaptureDiagnostic(oss.str());
+          }
           auto t_convert = std::chrono::steady_clock::now();
           capture_mutex.unlock();
 
@@ -359,8 +389,14 @@ void CaptureThread::run() {
 
               stack_mutex.lock();
               if (stack!=0) {
+                if (captureDiagnosticsEnabled()) {
+                  logCaptureDiagnostic("Entering stack->process");
+                }
                 stack->process(d);
                 stack->postProcess(d);
+                if (captureDiagnosticsEnabled()) {
+                  logCaptureDiagnostic("Finished stack->process");
+                }
               }
               stack_mutex.unlock();
               rb->nextWrite(true);

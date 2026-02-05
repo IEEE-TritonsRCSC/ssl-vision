@@ -175,7 +175,9 @@ MainWindow::MainWindow(bool start_capture, bool enforce_affinity, int num_camera
 
   setCentralWidget(splitter); //was splitter
 
-  startTimer(10);
+  // Adjust timer to ~30ms (33fps) for smoother display on macOS
+  // Original 10ms could cause excessive redraws and sync issues
+  startTimer(30);
 
   // connection must be queued as the data tree is locked
   // by a mutex when the signal is triggered
@@ -207,6 +209,8 @@ void MainWindow::timerEvent( QTimerEvent * e) {
 void MainWindow::slotSaveSettings()
 {
     VarXML::write(world,"settings.xml");
+    QSettings window_settings("RoboCup", "ssl-vision");
+    window_settings.sync();
 }
 
 void MainWindow::init() {
@@ -222,6 +226,7 @@ void MainWindow::closeEvent(QCloseEvent * event ) {
     window_settings.setValue("pos", pos());
     window_settings.setValue("size", size());
     window_settings.endGroup();
+    window_settings.sync();
   }
 }
 
@@ -229,6 +234,10 @@ MainWindow::~MainWindow() {
   if (affinity!=0) delete affinity;
   //FIXME: right now we don't clean up anything
   VarXML::write(world,"settings.xml");
+
+  // Force sync of QSettings to ensure data is written to disk
+  QSettings window_settings("RoboCup", "ssl-vision");
+  window_settings.sync();
 
   // Stop stack:
   multi_stack->stop();

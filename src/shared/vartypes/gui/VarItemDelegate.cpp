@@ -19,6 +19,8 @@
 */
 
 #include "VarItemDelegate.h"
+
+#include <QAbstractItemView>
 namespace VarTypes {
   VarItemDelegate::VarItemDelegate(QObject *parent) : QItemDelegate(parent)
   {
@@ -29,7 +31,15 @@ namespace VarTypes {
   }
   
   void VarItemDelegate::editorChangeEvent() {
-    emit(commitData((QWidget *)sender()));
+    auto *editor = qobject_cast<QWidget *>(sender());
+    auto *view = qobject_cast<QAbstractItemView *>(parent());
+    if (!editor || !view) {
+      return;
+    }
+    if (!view->isAncestorOf(editor) && view != editor) {
+      return;
+    }
+    emit commitData(editor);
   }
   
   void VarItemDelegate::paint ( QPainter * painter, const QStyleOptionViewItem & option, const QModelIndex & index ) const {
@@ -100,7 +110,6 @@ namespace VarTypes {
         painter->drawRect(frame);
   
         high_c.setAlpha(192);
-        QColor nocolor(255,255,255,0) ;
         painter->setPen(Qt::NoPen);
         painter->setBrush(QBrush(high_c));
         painter->drawRect(bar);

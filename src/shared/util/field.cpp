@@ -742,6 +742,7 @@ void RoboCupField::updateFieldLinesAndArcs() {
     double x_min = -fieldLengthHalf;
     double x_max = fieldLengthHalf;
     double x_goal = goal_on_right ? fieldLengthHalf : -fieldLengthHalf;
+    (void)x_goal; // Intentionally unused - reserved for future use
     double x_mid = goal_on_right ? -fieldLengthHalf : fieldLengthHalf;
 
     // Define line endpoints with rotation applied

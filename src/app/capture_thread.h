@@ -32,6 +32,7 @@
 #include "capture_generator.h"
 #include "capture_splitter.h"
 #include <QThread>
+#include <string>
 #include "ringbuffer.h"
 #include "framedata.h"
 #include "framecounter.h"
@@ -113,6 +114,7 @@ protected:
   VarTrigger * c_refresh;
   VarBool * c_auto_refresh;
   VarBool * c_print_timings;
+  VarBool * c_capture_diagnostics;
   VarStringEnum * captureModule;
 
 public slots:
@@ -135,6 +137,10 @@ public:
   ~CaptureThread();
 
   virtual void run();
+
+private:
+  bool captureDiagnosticsEnabled() const;
+  void logCaptureDiagnostic(const std::string &message) const;
 
 };
 

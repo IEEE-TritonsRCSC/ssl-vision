@@ -23,15 +23,20 @@
 #ifdef __APPLE__
 
 #import <AVFoundation/AVFoundation.h>
+#import <Accelerate/Accelerate.h>
 #import <CoreVideo/CoreVideo.h>
 #import <Foundation/Foundation.h>
+#import <dispatch/dispatch.h>
 
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <limits>
+#include <iostream>
+#include <sstream>
 
 #include <QString>
+#include <QMutexLocker>
 
 #include "colors.h"
 #include "rawimage.h"
@@ -40,7 +45,8 @@ namespace {
 constexpr double kDefaultFPS = 60.0;
 constexpr int kDefaultWidth = 1280;
 constexpr int kDefaultHeight = 720;
-constexpr size_t kMaxBufferedFrames = 2;
+constexpr size_t kMaxBufferedFrames = 3;
+constexpr int kFrameWaitTimeoutMs = 500;
 }
 
 @interface CaptureAVFoundationFrameDelegate : NSObject<AVCaptureVideoDataOutputSampleBufferDelegate>
@@ -72,11 +78,13 @@ CaptureAVFoundation::CaptureAVFoundation(VarList *settings, QObject *parent)
   v_height = new VarInt("height", kDefaultHeight, 120, 2160);
   v_fps = new VarInt("fps", static_cast<int>(kDefaultFPS), 1, 240);
   v_mirror = new VarBool("mirror", false);
+  v_diagnostics = new VarBool("diagnostics", false);
 
   capture_settings->addChild(v_width);
   capture_settings->addChild(v_height);
   capture_settings->addChild(v_fps);
   capture_settings->addChild(v_mirror);
+  capture_settings->addChild(v_diagnostics);
 
   refreshDevices();
 }
@@ -131,6 +139,13 @@ bool CaptureAVFoundation::ensureDeviceSelection() {
     return false;
   }
 
+  if (diagnosticsEnabled()) {
+    std::string deviceName = device.localizedName ? [device.localizedName UTF8String] : "Unknown";
+    std::ostringstream oss;
+    oss << "ensureDeviceSelection -> device='" << deviceName << "' requested='" << v_device->getString() << "'";
+    logDiagnostic(oss.str());
+  }
+
   return true;
 }
 
@@ -155,17 +170,6 @@ bool CaptureAVFoundation::applyFormatPreferences(AVCaptureDevice *device) {
     double widthDiff = std::abs(dims.width - desiredWidth);
     double heightDiff = std::abs(dims.height - desiredHeight);
 
-    bool supportsFps = false;
-    for (AVFrameRateRange *range in format.videoSupportedFrameRateRanges) {
-      if (desiredFps >= range.minFrameRate && desiredFps <= range.maxFrameRate) {
-        supportsFps = true;
-        break;
-      }
-    }
-    if (!supportsFps) {
-      continue;
-    }
-
     double score = widthDiff + heightDiff;
     if (score < bestScore) {
       bestScore = score;
@@ -173,14 +177,33 @@ bool CaptureAVFoundation::applyFormatPreferences(AVCaptureDevice *device) {
     }
   }
 
+  double actualFps = desiredFps;
   if (selectedFormat) {
     device.activeFormat = selectedFormat;
-    CMTime desiredDuration = CMTimeMake(1, static_cast<int32_t>(std::max(1, static_cast<int>(desiredFps))));
-    device.activeVideoMinFrameDuration = desiredDuration;
-    device.activeVideoMaxFrameDuration = desiredDuration;
+
+    // Determine the maximum supported frame rate for the selected format
+    double maxSupportedFps = 0.0;
+    for (AVFrameRateRange *range in selectedFormat.videoSupportedFrameRateRanges) {
+      maxSupportedFps = std::max(maxSupportedFps, range.maxFrameRate);
+    }
+
+    // Clamp desired FPS to the maximum supported by the format
+    actualFps = std::min(desiredFps, maxSupportedFps);
+    if (actualFps <= 0.0) {
+      actualFps = 1.0;
+    }
   }
 
   [device unlockForConfiguration];
+
+  if (diagnosticsEnabled()) {
+    CMVideoDimensions dims = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription);
+    std::ostringstream oss;
+    oss << "applyFormatPreferences -> desired=" << desiredWidth << "x" << desiredHeight
+        << "@" << desiredFps << "fps | selected=" << dims.width << "x" << dims.height
+        << "@" << actualFps << "fps";
+    logDiagnostic(oss.str());
+  }
   return true;
 }
 
@@ -203,7 +226,7 @@ bool CaptureAVFoundation::configureSession() {
 
   video_output = [[AVCaptureVideoDataOutput alloc] init];
   video_output.videoSettings = @{(id)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_32BGRA)};
-  video_output.alwaysDiscardsLateVideoFrames = YES;
+  video_output.alwaysDiscardsLateVideoFrames = NO;
 
   if (![session canAddOutput:video_output]) {
     fprintf(stderr, "[AVFoundation] Unable to add video output\n");
@@ -226,10 +249,35 @@ bool CaptureAVFoundation::configureSession() {
     connection.videoOrientation = AVCaptureVideoOrientationLandscapeRight;
   }
 
-  CMTime minFrameDuration = CMTimeMake(1, std::max(1, v_fps->getInt()));
+  double configuredFps = 0.0;
   if (connection) {
+    // Clamp FPS to device's supported range for the active format
+    double desiredFps = std::max(1, v_fps->getInt());
+    double actualFps = desiredFps;
+
+    AVCaptureDevice *device = device_input.device;
+    if (device && device.activeFormat) {
+      double maxSupportedFps = 0.0;
+      for (AVFrameRateRange *range in device.activeFormat.videoSupportedFrameRateRanges) {
+        maxSupportedFps = std::max(maxSupportedFps, range.maxFrameRate);
+      }
+      actualFps = std::min(desiredFps, maxSupportedFps);
+      if (actualFps <= 0.0) {
+        actualFps = 1.0;
+      }
+    }
+
+    CMTime minFrameDuration = CMTimeMake(1, static_cast<int32_t>(actualFps));
     connection.videoMinFrameDuration = minFrameDuration;
     connection.videoMaxFrameDuration = minFrameDuration;
+    configuredFps = actualFps;
+  }
+
+  if (diagnosticsEnabled()) {
+    std::ostringstream oss;
+    oss << "configureSession -> queue='" << (capture_queue ? "created" : "null")
+        << "' configuredFps=" << configuredFps;
+    logDiagnostic(oss.str());
   }
 
   return true;
@@ -293,17 +341,42 @@ bool CaptureAVFoundation::stopCapture() {
 RawImage CaptureAVFoundation::getFrame() {
   QMutexLocker locker(&frame_mutex);
   if (frame_queue.empty()) {
-    frame_available.wait(&frame_mutex, 50);
+    frame_available.wait(&frame_mutex, kFrameWaitTimeoutMs);
   }
 
   if (frame_queue.empty()) {
+    if (diagnosticsEnabled()) {
+      logDiagnostic("frame_queue empty after wait; returning zero-sized frame");
+    }
+    frame_buffer.setColorFormat(COLOR_RGB8);
     frame_buffer.clear();
+    frame_buffer.setWidth(0);
+    frame_buffer.setHeight(0);
+    frame_buffer.setData(nullptr);
     return frame_buffer;
   }
 
   CapturedFrame frame = frame_queue.front();
   frame_queue.pop_front();
+  if (diagnosticsEnabled()) {
+    std::ostringstream oss;
+    oss << "Dequeued frame " << frame.width << "x" << frame.height
+        << " | queue_size=" << frame_queue.size();
+    logDiagnostic(oss.str());
+  }
   locker.unlock();
+
+  if (frame.width <= 0 || frame.height <= 0 || frame.pixels.empty()) {
+    if (diagnosticsEnabled()) {
+      logDiagnostic("Dequeued invalid frame (zero dimensions or empty pixels)");
+    }
+    frame_buffer.setColorFormat(COLOR_RGB8);
+    frame_buffer.clear();
+    frame_buffer.setWidth(0);
+    frame_buffer.setHeight(0);
+    frame_buffer.setData(nullptr);
+    return frame_buffer;
+  }
 
   frame_buffer.ensure_allocation(COLOR_RGB8, frame.width, frame.height);
   std::memcpy(frame_buffer.getData(), frame.pixels.data(), frame_buffer.getNumBytes());
@@ -312,6 +385,14 @@ RawImage CaptureAVFoundation::getFrame() {
   frame_buffer.setWidth(frame.width);
   frame_buffer.setHeight(frame.height);
   frame_buffer.setColorFormat(COLOR_RGB8);
+
+  if (diagnosticsEnabled()) {
+    std::ostringstream oss;
+    oss << "Returning frame " << frame.width << "x" << frame.height
+        << " timestamp=" << frame.timestamp_cam;
+    logDiagnostic(oss.str());
+  }
+
   return frame_buffer;
 }
 
@@ -329,6 +410,7 @@ void CaptureAVFoundation::handleSampleBuffer(CMSampleBufferRef sampleBuffer) {
     return;
   }
 
+  CVPixelBufferRetain(imageBuffer);
   CVPixelBufferLockBaseAddress(imageBuffer, kCVPixelBufferLock_ReadOnly);
 
   size_t width = CVPixelBufferGetWidth(imageBuffer);
@@ -336,35 +418,74 @@ void CaptureAVFoundation::handleSampleBuffer(CMSampleBufferRef sampleBuffer) {
   size_t bytesPerRow = CVPixelBufferGetBytesPerRow(imageBuffer);
   unsigned char *baseAddress = static_cast<unsigned char *>(CVPixelBufferGetBaseAddress(imageBuffer));
 
+  if (diagnosticsEnabled()) {
+    std::ostringstream oss;
+    oss << "handleSampleBuffer -> " << width << "x" << height
+        << " bytesPerRow=" << bytesPerRow;
+    logDiagnostic(oss.str());
+  }
+
+  // Get the actual timestamp from the sample buffer for accurate frame rate
+  CMTime sampleTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
+  double timestampCam = (CMTimeGetSeconds(sampleTime) * 60000.0);
+
   // Convert BGRA -> RGB
   CapturedFrame frame;
   frame.width = static_cast<int>(width);
   frame.height = static_cast<int>(height);
   frame.timestamp = GetTimeSec();
-  frame.timestamp_cam = CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(sampleBuffer));
-  frame.pixels.resize(width * height * 3);
+  frame.timestamp_cam = timestampCam;
+  const size_t expectedBytes = width * height * 3;
+  frame.pixels.resize(expectedBytes);
 
-  for (size_t y = 0; y < height; ++y) {
-    const unsigned char *src = baseAddress + y * bytesPerRow;
-    unsigned char *dst = frame.pixels.data() + y * width * 3;
-    for (size_t x = 0; x < width; ++x) {
-      // BGRA order
-      dst[0] = src[2]; // R
-      dst[1] = src[1]; // G
-      dst[2] = src[0]; // B
-      src += 4;
-      dst += 3;
-    }
+  vImage_Buffer src = { (void*)baseAddress, static_cast<vImagePixelCount>(height), static_cast<vImagePixelCount>(width), bytesPerRow };
+  vImage_Buffer dst = { frame.pixels.data(), static_cast<vImagePixelCount>(height), static_cast<vImagePixelCount>(width), static_cast<vImagePixelCount>(width * 3) };
+  vImage_Error convertStatus = vImageConvert_BGRA8888toRGB888(&src, &dst, kvImageNoFlags);
+  if (convertStatus != kvImageNoError) {
+    fprintf(stderr, "[AVFoundation] vImageConvert_BGRA8888toRGB888 failed: %ld\n", convertStatus);
+    frame.pixels.clear();
+    CVPixelBufferUnlockBaseAddress(imageBuffer, kCVPixelBufferLock_ReadOnly);
+    CVPixelBufferRelease(imageBuffer);
+    return;
   }
 
   CVPixelBufferUnlockBaseAddress(imageBuffer, kCVPixelBufferLock_ReadOnly);
+  CVPixelBufferRelease(imageBuffer);
 
-  QMutexLocker locker(&frame_mutex);
-  if (frame_queue.size() >= kMaxBufferedFrames) {
-    frame_queue.pop_front();
+  if (frame.pixels.empty()) {
+    if (diagnosticsEnabled()) {
+      logDiagnostic("Conversion produced empty pixel buffer; dropping frame");
+    }
+    return;
   }
-  frame_queue.push_back(std::move(frame));
+
+  {
+    QMutexLocker locker(&frame_mutex);
+    if (frame_queue.size() >= kMaxBufferedFrames) {
+      if (diagnosticsEnabled()) {
+        logDiagnostic("Frame queue full; dropping oldest frame");
+      }
+      frame_queue.pop_front();
+    }
+    frame_queue.push_back(std::move(frame));
+    if (diagnosticsEnabled()) {
+      std::ostringstream oss;
+      oss << "Queued frame | queue_size=" << frame_queue.size();
+      logDiagnostic(oss.str());
+    }
+  }
+
   frame_available.wakeOne();
+}
+
+bool CaptureAVFoundation::diagnosticsEnabled() const {
+  return v_diagnostics && v_diagnostics->getBool();
+}
+
+void CaptureAVFoundation::logDiagnostic(const std::string &message) const {
+  if (diagnosticsEnabled()) {
+    std::cout << "[AVFoundation][Diag] " << message << std::endl;
+  }
 }
 
 #endif // __APPLE__

@@ -52,8 +52,15 @@ PluginColorThresholdWorker::PluginColorThresholdWorker(int _id, int _totalThread
 }
 
 PluginColorThresholdWorker::~PluginColorThresholdWorker() {
-  thread->quit();
-  thread->deleteLater();
+  if (thread) {
+    thread->quit();
+    if (!thread->wait(2000)) {
+      thread->requestInterruption();
+      thread->wait();
+    }
+    delete thread;
+    thread = nullptr;
+  }
 }
 
 
@@ -118,7 +125,7 @@ PluginColorThreshold::~PluginColorThreshold()
 
 void PluginColorThreshold::clearWorkers() {
   for (auto worker : workers) {
-    worker->deleteLater();
+    delete worker;
   }
   workers.clear();
 }
