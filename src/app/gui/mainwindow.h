@@ -63,8 +63,15 @@ public:
   VarTreeModel * tmodel;
   vector<RealTimeDisplayWidget *> display_widgets;
   vector<QSplitter *> stack_widgets;
+  vector<QWidget *> stack_right_panes;
+  vector<QList<int>> stack_sizes_before_right_hide;
   RenderOptions * opts;
   VarTrigger * save_settings_trigger;
+  QToolBar * pane_toolbar = nullptr;
+  QAction * action_toggle_left_pane = nullptr;
+  QAction * action_toggle_right_pane = nullptr;
+  QList<int> splitter_sizes_before_left_hide;
+  QList<int> splitter_sizes_before_right_hide;
 
   MultiVisionStack * multi_stack;
 
@@ -77,6 +84,8 @@ public:
 
 public slots:
   void slotSaveSettings();
+  void toggleLeftPane();
+  void toggleRightPane();
 };
 
 

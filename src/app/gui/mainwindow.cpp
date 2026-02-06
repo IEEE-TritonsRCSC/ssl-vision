@@ -35,6 +35,9 @@ MainWindow::MainWindow(bool start_capture, bool enforce_affinity, int num_camera
   tmodel=new VarTreeModel();
 
   splitter = new QSplitter(Qt::Horizontal,this);
+  splitter->setOpaqueResize(true);
+  splitter->setChildrenCollapsible(false);
+  splitter->setHandleWidth(8);
   cam_tabs = new QTabWidget();
 
   root=new VarList("Vision System");
@@ -78,16 +81,29 @@ MainWindow::MainWindow(bool start_capture, bool enforce_affinity, int num_camera
     //iterate through plugin variables
 
     QSplitter * stack_widget = new QSplitter(Qt::Horizontal);
+    stack_widget->setOpaqueResize(true);
+    stack_widget->setChildrenCollapsible(false);
+    stack_widget->setHandleWidth(8);
     stack_widgets.push_back(stack_widget);
     QSplitter * stack_vis_splitter = new QSplitter(Qt::Vertical);
+    stack_vis_splitter->setOpaqueResize(true);
+    stack_vis_splitter->setChildrenCollapsible(false);
+    stack_vis_splitter->setHandleWidth(6);
     stack_widget->addWidget(stack_vis_splitter);
     QTabWidget * stack_control_tab = new QTabWidget();
     stack_control_tab->setTabPosition(QTabWidget::East);
+    stack_control_tab->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+    stack_control_tab->setMinimumWidth(260);
     stack_widget->addWidget(stack_control_tab);
+    stack_widget->setStretchFactor(0, 3);
+    stack_widget->setStretchFactor(1, 1);
 
     VideoWidget * w=new VideoWidget(label,gl);
     display_widgets.push_back(gl);
     threadvar->addChild(multi_stack->threads[i]->getSettings());
+    w->setRightPane(stack_widget, stack_control_tab);
+    stack_right_panes.push_back(stack_control_tab);
+    stack_sizes_before_right_hide.push_back(QList<int>());
 
     stack_vis_splitter->addWidget(w);
     //iterate through all plugins
@@ -175,6 +191,26 @@ MainWindow::MainWindow(bool start_capture, bool enforce_affinity, int num_camera
 
   setCentralWidget(splitter); //was splitter
 
+  splitter->setStretchFactor(0, 0);
+  splitter->setStretchFactor(1, 1);
+  if (right_tab != 0) splitter->setStretchFactor(2, 0);
+
+  pane_toolbar = addToolBar("Panels");
+  pane_toolbar->setMovable(false);
+  pane_toolbar->setFloatable(false);
+  pane_toolbar->setIconSize(QSize(16, 16));
+
+  action_toggle_left_pane = new QAction("Toggle Left Pane", this);
+  action_toggle_left_pane->setToolTip("Collapse/uncollapse the left data tree pane");
+  connect(action_toggle_left_pane, SIGNAL(triggered()), this, SLOT(toggleLeftPane()));
+  pane_toolbar->addAction(action_toggle_left_pane);
+
+  action_toggle_right_pane = new QAction("Toggle Right Pane", this);
+  action_toggle_right_pane->setToolTip("Collapse/uncollapse the thread controls pane (DVR/Mask/etc)");
+  action_toggle_right_pane->setEnabled(!stack_right_panes.empty());
+  connect(action_toggle_right_pane, SIGNAL(triggered()), this, SLOT(toggleRightPane()));
+  pane_toolbar->addAction(action_toggle_right_pane);
+
   // Adjust timer to ~30ms (33fps) for smoother display on macOS
   // Original 10ms could cause excessive redraws and sync issues
   startTimer(30);
@@ -183,6 +219,68 @@ MainWindow::MainWindow(bool start_capture, bool enforce_affinity, int num_camera
   // by a mutex when the signal is triggered
   connect(save_settings_trigger, SIGNAL(signalTriggered()),
           this, SLOT(slotSaveSettings()), Qt::QueuedConnection);
+}
+
+void MainWindow::toggleLeftPane() {
+  if (left_tab == nullptr || splitter == nullptr) return;
+  const bool was_visible = left_tab->isVisible();
+  if (was_visible) splitter_sizes_before_left_hide = splitter->sizes();
+  left_tab->setVisible(!was_visible);
+
+  if (!was_visible) {
+    // Unhiding: restore sizes if we have them.
+    if (!splitter_sizes_before_left_hide.isEmpty() &&
+        splitter_sizes_before_left_hide.size() == splitter->count()) {
+      splitter->setSizes(splitter_sizes_before_left_hide);
+    }
+    return;
+  }
+
+  // Hiding: give space to the remaining panes.
+  QList<int> sizes = splitter->sizes();
+  if (sizes.size() >= 2) {
+    sizes[0] = 0;
+    splitter->setSizes(sizes);
+  }
+}
+
+void MainWindow::toggleRightPane() {
+  if (cam_tabs == nullptr) return;
+  const int idx = cam_tabs->currentIndex();
+  if (idx < 0) return;
+  if (idx >= (int)stack_widgets.size()) return;
+  if (idx >= (int)stack_right_panes.size()) return;
+  if (stack_widgets[idx] == nullptr || stack_right_panes[idx] == nullptr) return;
+
+  QSplitter * stack_widget = stack_widgets[idx];
+  QWidget * right_pane = stack_right_panes[idx];
+
+  const bool was_visible = right_pane->isVisible();
+  if (was_visible) stack_sizes_before_right_hide[idx] = stack_widget->sizes();
+
+  right_pane->setVisible(!was_visible);
+  if (!was_visible) {
+    // Unhiding: restore sizes if we have them.
+    const QList<int> restore_sizes = stack_sizes_before_right_hide[idx];
+    if (!restore_sizes.isEmpty() && restore_sizes.size() == stack_widget->count()) {
+      stack_widget->setSizes(restore_sizes);
+    } else {
+      // Fallback: make sure the right pane is visible with a sensible width.
+      QList<int> sizes = stack_widget->sizes();
+      if (sizes.size() >= 2) {
+        sizes[1] = qMax(right_pane->minimumWidth(), sizes[1] > 0 ? sizes[1] : right_pane->minimumWidth());
+        stack_widget->setSizes(sizes);
+      }
+    }
+    return;
+  }
+
+  // Hiding: give space to the video/visualization side.
+  QList<int> sizes = stack_widget->sizes();
+  if (sizes.size() >= 2) {
+    sizes[1] = 0;
+    stack_widget->setSizes(sizes);
+  }
 }
 
 void MainWindow::timerEvent( QTimerEvent * e) {

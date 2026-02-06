@@ -46,8 +46,12 @@ class VideoWidget : public QWidget, public Ui_VideoWidget {
     QAction * actionWindow;
     QAction * actionFullscreen;
     QAction * actionCoordinateGraph;
+    QAction * actionRightPane;
     QWidget * _vis; //our child-widget (e.g. GlWidget or HistWidget)
     VarTypes::VarBool * _v_coordinate_graph;
+    QSplitter * _side_splitter = nullptr;
+    QWidget * _right_pane = nullptr;
+    QList<int> _sizes_before_right_hide;
     void closeEvent(QCloseEvent * event);
     void focusInEvent(QFocusEvent * event);
 
@@ -57,6 +61,7 @@ class VideoWidget : public QWidget, public Ui_VideoWidget {
 
   public:
     void setCoordinateGraphVar(VarTypes::VarBool * var) { _v_coordinate_graph = var; }
+    void setRightPane(QSplitter * splitter, QWidget * right_pane);
 
   public slots:
     void processVideoStats(VideoStats stats);
@@ -64,6 +69,7 @@ class VideoWidget : public QWidget, public Ui_VideoWidget {
     void toggleWindow(bool val);
     void toggleFullScreen(bool val);
     void toggleCoordinateGraph(bool val);
+    void toggleRightPane(bool val);
 
 };
 

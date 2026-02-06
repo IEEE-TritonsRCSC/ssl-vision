@@ -31,6 +31,7 @@ VideoWidget::VideoWidget(QString title, QWidget * vis)
 
   _vis=vis;
   _v_coordinate_graph = nullptr;
+  actionRightPane = nullptr;
 
   //create a toolbar and add all the actions:
   QToolBar * toolbar=new QToolBar();
@@ -67,6 +68,17 @@ VideoWidget::VideoWidget(QString title, QWidget * vis)
   if (vis!=0)
     vis->addAction(actionCoordinateGraph);
   connect(actionCoordinateGraph, SIGNAL(triggered(bool)), this, SLOT(toggleCoordinateGraph(bool)));
+
+  actionRightPane = new QAction(this);
+  actionRightPane->setObjectName("actionRightPane");
+  actionRightPane->setCheckable(true);
+  actionRightPane->setChecked(true);
+  actionRightPane->setIcon(QIcon(":/icons/arrow-right.png"));
+  actionRightPane->setToolTip("Collapse/uncollapse the right controls pane");
+  actionRightPane->setShortcutContext(Qt::WidgetShortcut);
+  if (vis!=0)
+    vis->addAction(actionRightPane);
+  connect(actionRightPane, SIGNAL(triggered(bool)), this, SLOT(toggleRightPane(bool)));
 
 
   toolbar->setIconSize(QSize(16,16));
@@ -209,4 +221,37 @@ void VideoWidget::toggleCoordinateGraph(bool val)
   if (_v_coordinate_graph != nullptr) {
     _v_coordinate_graph->setBool(val);
   }
+}
+
+void VideoWidget::setRightPane(QSplitter * splitter, QWidget * right_pane) {
+  _side_splitter = splitter;
+  _right_pane = right_pane;
+  if (actionRightPane != nullptr) {
+    actionRightPane->setEnabled((_side_splitter != nullptr) && (_right_pane != nullptr));
+    actionRightPane->setChecked((_right_pane != nullptr) ? _right_pane->isVisible() : false);
+  }
+}
+
+void VideoWidget::toggleRightPane(bool val) {
+  (void)val;
+  if (_side_splitter == nullptr || _right_pane == nullptr) return;
+
+  const bool was_visible = _right_pane->isVisible();
+  if (was_visible) _sizes_before_right_hide = _side_splitter->sizes();
+  _right_pane->setVisible(!was_visible);
+
+  if (!was_visible) {
+    if (!_sizes_before_right_hide.isEmpty() && _sizes_before_right_hide.size() == _side_splitter->count()) {
+      _side_splitter->setSizes(_sizes_before_right_hide);
+    }
+    if (actionRightPane != nullptr) actionRightPane->setChecked(true);
+    return;
+  }
+
+  QList<int> sizes = _side_splitter->sizes();
+  if (sizes.size() >= 2) {
+    sizes[sizes.size() - 1] = 0;
+    _side_splitter->setSizes(sizes);
+  }
+  if (actionRightPane != nullptr) actionRightPane->setChecked(false);
 }
