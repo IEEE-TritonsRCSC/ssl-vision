@@ -30,6 +30,27 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+has_cmake_flag() {
+  local key="$1"
+  for arg in "${EXTRA_ARGS[@]}"; do
+    if [[ "$arg" == "-D${key}="* ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  # Avoid stale CMake cache values re-enabling optional camera SDKs on macOS.
+  has_cmake_flag "USE_DC1394" || EXTRA_ARGS+=("-DUSE_DC1394=OFF")
+  has_cmake_flag "USE_V4L" || EXTRA_ARGS+=("-DUSE_V4L=OFF")
+  has_cmake_flag "USE_SPINNAKER" || EXTRA_ARGS+=("-DUSE_SPINNAKER=OFF")
+  has_cmake_flag "USE_PYLON" || EXTRA_ARGS+=("-DUSE_PYLON=OFF")
+  has_cmake_flag "USE_mvIMPACT" || EXTRA_ARGS+=("-DUSE_mvIMPACT=OFF")
+  has_cmake_flag "USE_FLYCAP" || EXTRA_ARGS+=("-DUSE_FLYCAP=OFF")
+  has_cmake_flag "USE_AVFOUNDATION" || EXTRA_ARGS+=("-DUSE_AVFOUNDATION=ON")
+fi
+
 mkdir -p "$BUILD_DIR"
 CACHE_FILE="$BUILD_DIR/CMakeCache.txt"
 if [[ -f "$CACHE_FILE" ]]; then

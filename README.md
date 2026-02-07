@@ -29,6 +29,10 @@ Use the configure helper script so stale CMake cache entries are handled automat
   -DCMAKE_BUILD_TYPE=Release \
   -DUSE_DC1394=OFF \
   -DUSE_V4L=OFF \
+  -DUSE_SPINNAKER=OFF \
+  -DUSE_PYLON=OFF \
+  -DUSE_mvIMPACT=OFF \
+  -DUSE_FLYCAP=OFF \
   -DUSE_AVFOUNDATION=ON \
   -DCMAKE_PREFIX_PATH="$(brew --prefix qt@6)" \
   -DCMAKE_OSX_DEPLOYMENT_TARGET="$(sw_vers -productVersion)"
@@ -37,7 +41,7 @@ Use the configure helper script so stale CMake cache entries are handled automat
 Notes:
 
 - `USE_AVFOUNDATION=ON` is the macOS camera backend.
-- `USE_DC1394=OFF` and `USE_V4L=OFF` are required for normal macOS builds.
+- All optional vendor SDK backends are disabled by default unless you explicitly enable them.
 
 ## 3) Build
 
@@ -89,6 +93,10 @@ rm -rf build bin
   -DCMAKE_BUILD_TYPE=Release \
   -DUSE_DC1394=OFF \
   -DUSE_V4L=OFF \
+  -DUSE_SPINNAKER=OFF \
+  -DUSE_PYLON=OFF \
+  -DUSE_mvIMPACT=OFF \
+  -DUSE_FLYCAP=OFF \
   -DUSE_AVFOUNDATION=ON \
   -DCMAKE_PREFIX_PATH="$(brew --prefix qt@6)" \
   -DCMAKE_OSX_DEPLOYMENT_TARGET="$(sw_vers -productVersion)"
