@@ -25,12 +25,20 @@ BREW_PACKAGES=(
   tbb
   boost
   libpcap
-  libav
-  libdispatch
+  ffmpeg
 )
+
+formula_exists() {
+  brew info --formula "$1" >/dev/null 2>&1
+}
 
 echo "Installing base dependencies..."
 for pkg in "${BREW_PACKAGES[@]}"; do
+  if ! formula_exists "${pkg}"; then
+    echo "[brew] Skipping ${pkg} (formula not available on this Homebrew setup)"
+    continue
+  fi
+
   if brew list --versions "${pkg}" >/dev/null 2>&1; then
     echo "[brew] ${pkg} already installed"
   else
