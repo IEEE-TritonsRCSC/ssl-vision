@@ -9,10 +9,26 @@
 #define CAPTURE_BASLER_H_
 
 #include "captureinterface.h"
+#if defined(__has_include)
+#if __has_include(<pylon/PylonIncludes.h>)
 #include <pylon/PylonIncludes.h>
 #include <pylon/PylonBase.h>
 #include <pylon/PylonImage.h>
 #include <pylon/gige/BaslerGigEInstantCamera.h>
+#elif __has_include(<PylonIncludes.h>)
+#include <PylonIncludes.h>
+#include <PylonBase.h>
+#include <PylonImage.h>
+#include <gige/BaslerGigEInstantCamera.h>
+#else
+#error "Pylon headers not found. Check your Pylon SDK include path."
+#endif
+#else
+#include <pylon/PylonIncludes.h>
+#include <pylon/PylonBase.h>
+#include <pylon/PylonImage.h>
+#include <pylon/gige/BaslerGigEInstantCamera.h>
+#endif
 #include <sys/time.h>
 #include "VarTypes.h"
 #include "TimeSync.h"
